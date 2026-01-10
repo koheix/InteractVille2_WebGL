@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 33abca54baeca2545a0b1af5dc84c961
+timeCreated: 1527764025
+licenseType: Store
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Sounds/Gameplay/Freesound.org (Public Domain)/Bush Movement.txt
+  uploadId: 770333

@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 58b6e881f3daa674c81417ea59bc128b
+timeCreated: 1525246200
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Tiles/Tiles/Shadows_LeftBot.asset
+  uploadId: 770333

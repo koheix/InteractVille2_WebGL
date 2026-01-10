@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: fe8ad2c2623733b4cba2fa5461eaf700
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Tiles/Tiles/Cliff_Ground.asset
+  uploadId: 770333

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8dfae67aabad1a349a6d8c1e316db323
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 4343727234628468602
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Sprites/OutDoors.spriteatlas
+  uploadId: 770333

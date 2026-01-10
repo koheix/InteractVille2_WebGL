@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 7ad2d247e2d6fa045b0a05ec06610c84
+timeCreated: 1525171815
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Tiles/Materials/Tilemap_Shadows.mat
+  uploadId: 770333

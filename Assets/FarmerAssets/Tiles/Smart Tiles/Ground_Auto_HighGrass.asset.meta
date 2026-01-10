@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: e770d3ec397b5534781d6d0ef5ec8b0e
+timeCreated: 1525093415
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Tiles/Smart Tiles/Ground_Auto_HighGrass.asset
+  uploadId: 770333

@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 1ec2b3c84973f8b4b9869c10bfbd5951
+timeCreated: 1525335907
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Materials/Sprites.mat
+  uploadId: 770333

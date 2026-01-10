@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: f1ebf03a9fd27bf46b84d6dbb07406e0
+timeCreated: 1525246235
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Tiles/Tiles/Shadows_RightTop.asset
+  uploadId: 770333

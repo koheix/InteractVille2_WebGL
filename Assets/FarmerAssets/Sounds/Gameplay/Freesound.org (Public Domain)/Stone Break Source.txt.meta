@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 2759b4b01cf1100428cdde3a3c0a1fe8
+timeCreated: 1527751225
+licenseType: Store
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Sounds/Gameplay/Freesound.org (Public Domain)/Stone Break
+    Source.txt
+  uploadId: 770333

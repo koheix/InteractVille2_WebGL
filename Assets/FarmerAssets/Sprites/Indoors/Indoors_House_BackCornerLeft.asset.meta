@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 77effaf522691ce48bf04814a1890f57
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Sprites/Indoors/Indoors_House_BackCornerLeft.asset
+  uploadId: 770333

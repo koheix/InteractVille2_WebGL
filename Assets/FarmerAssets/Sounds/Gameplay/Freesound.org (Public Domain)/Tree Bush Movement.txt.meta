@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: a564cac8b23e7ae44add4019a871de8a
+timeCreated: 1527763903
+licenseType: Store
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Sounds/Gameplay/Freesound.org (Public Domain)/Tree Bush
+    Movement.txt
+  uploadId: 770333

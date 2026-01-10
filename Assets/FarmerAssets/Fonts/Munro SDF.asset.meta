@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: d6407900772a2164a98fedf5680bd64c
+timeCreated: 1525953482
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Fonts/Munro SDF.asset
+  uploadId: 770333

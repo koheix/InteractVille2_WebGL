@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: fe385da54e3b9d44d891b2a4563f11c3
+timeCreated: 1525117426
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Tiles/Tiles/Cliffs_SideBack.asset
+  uploadId: 770333

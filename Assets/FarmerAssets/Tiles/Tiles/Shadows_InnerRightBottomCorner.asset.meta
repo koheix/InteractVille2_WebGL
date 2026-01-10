@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: d042885cb92371243b6889373a02d692
+timeCreated: 1525246895
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Tiles/Tiles/Shadows_InnerRightBottomCorner.asset
+  uploadId: 770333

@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 3100454cf499f32419aaefbea2d1f7ad
+timeCreated: 1527751103
+licenseType: Store
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Sounds/Gameplay/Freesound.org (Public Domain)/Stone Hit
+    Source.txt
+  uploadId: 770333

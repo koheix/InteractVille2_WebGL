@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 942cb15e68154184a85641b4d0c78700
+timeCreated: 1525117260
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 121080
+  packageName: RPG Farming Kit
+  packageVersion: 1.1.2
+  assetPath: Assets/Content/Tiles/Tiles/Cliff_Front_Top.asset
+  uploadId: 770333
