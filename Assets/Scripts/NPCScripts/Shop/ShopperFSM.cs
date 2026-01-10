@@ -10,6 +10,9 @@ public enum ShopState
     Idle,       // 待機中
     Greeting,   // 挨拶
     BuyMenu,    // 購入メニュー
+    BoughtItem, // アイテム購入後
+    // CannotBuyItem, // アイテムが買えない(りんご不足など)
+    NotBoughtItem, // アイテム未購入後
     // SellMenu,   // 売却メニュー
     End         // 終了
 }
@@ -42,7 +45,16 @@ public class ShopperFSM
         }
         else if (currentState == ShopState.BuyMenu)
         {
-            return EnterState(ShopState.End);
+            // return EnterState(ShopState.End);
+            if(isYes)
+            {
+                return EnterState(ShopState.BoughtItem);
+            }
+            else
+            {
+                // return EnterState(ShopState.NotBoughtItem);
+                return EnterState(ShopState.End);
+            } 
         }
         else // currentState == ShopState.End
         {
@@ -82,6 +94,24 @@ public class ShopperFSM
             //     Debug.Log("NPC：売りたいもんあるん？見せて💰");
             //     // インベントリの売却処理を書く
             //     break;
+            case ShopState.BoughtItem:
+                Debug.Log("NPC：お買い上げありがとうございます！");
+                DialogueLine[] boughtLines = new DialogueLine[1];
+                boughtLines[0] = new DialogueLine
+                {
+                    characterName = "おみせのひと",
+                    text = "お買い上げありがとうございます！"
+                };
+                return boughtLines;
+            case ShopState.NotBoughtItem:
+                Debug.Log("NPC：またのご来店をお待ちしております！");
+                DialogueLine[] notBoughtLines = new DialogueLine[1];
+                notBoughtLines[0] = new DialogueLine
+                {
+                    characterName = "おみせのひと",
+                    text = "またのご来店をお待ちしております！"
+                };
+                return notBoughtLines;
 
             case ShopState.End:
                 Debug.Log("NPC：また来てね！");

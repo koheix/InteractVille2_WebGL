@@ -68,9 +68,19 @@ public class ShopperDialogueSystem : DialogueSystem
         base.StartDialogue();
     }
 
+    protected override void EndDialogue()
+    {
+        base.EndDialogue();
+        buyBox.SetActive(false);
+    }
+
     // はいかいいえボタンがクリックされたときに呼び出される
     void OnClickYorNButton(Button clickedButton)
     {
+        if (shopperFSM.CurrentState == ShopState.End)
+        {
+            EndDialogue();
+        }
         Debug.Log("Clicked Button: " + clickedButton.name);
         bool isYes = (clickedButton == yesButton);
         dialogueLines = shopperFSM.changeState(isYes);
@@ -85,11 +95,11 @@ public class ShopperDialogueSystem : DialogueSystem
             dialogueBox.SetActive(false);
             buyBox.SetActive(true);
         }
-        else if (shopperFSM.CurrentState == ShopState.End)
-        {
-            dialogueLines = shopperFSM.changeState(isYes);
-            EndDialogue();
-        }
+        // else if (shopperFSM.CurrentState == ShopState.End)
+        // {
+        //     dialogueLines = shopperFSM.changeState(isYes);
+        //     EndDialogue();
+        // }
     }
 
     // buyboxのはいかいいえボタンがクリックされたときに呼び出される
@@ -97,25 +107,34 @@ public class ShopperDialogueSystem : DialogueSystem
     {
         Debug.Log("Clicked BuyBox Button: " + clickedButton.name);
         bool isYes = (clickedButton == buyBoxYesButton);
+        bool isPurchaseSuccessful = false;
         // 商品の購入処理をここに追加
         if (isYes)
         {
             Debug.Log("Player chose to buy the item.");
             // ここでshopManagerのBuyItemメソッドを呼び出すなどの処理を追加
-            shopManager.BuyItem();
+            isPurchaseSuccessful = shopManager.BuyItem();
+            if(!isPurchaseSuccessful)
+            {
+                // りんごが足りないことを表示
+                buyBoxDialogueText.text = "りんごが足りないみたい！！";
+            }
         }
         else
         {
             Debug.Log("Player chose not to buy the item.");
         }
-        dialogueLines = shopperFSM.changeState(isYes);
-        currentLineIndex = 0;
-        DisplayLine();
-        // 買い物状態が終了したら基本UIBOXを表示して買い物UIを非表示にする
-        if (shopperFSM.CurrentState == ShopState.End)
-        {
-            dialogueBox.SetActive(true);
-            buyBox.SetActive(false);
+        // 買い物したか、いいえボタンが押された場合は進む
+        if(isPurchaseSuccessful || !isYes){
+            dialogueLines = shopperFSM.changeState(isPurchaseSuccessful);
+            currentLineIndex = 0;
+            DisplayLine();
+            // 買い物状態が終了したら基本UIBOXを表示して買い物UIを非表示にする
+            if (shopperFSM.CurrentState == ShopState.BoughtItem || shopperFSM.CurrentState == ShopState.NotBoughtItem || shopperFSM.CurrentState == ShopState.End)
+            {
+                dialogueBox.SetActive(true);
+                buyBox.SetActive(false);
+            }
         }
     }
 
