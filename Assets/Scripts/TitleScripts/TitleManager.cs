@@ -38,10 +38,6 @@ public class TitleManager : MonoBehaviour
     
     void Start()
     {
-        // playFabLoginManagerを使ってPlayFabにログイン
-        // playFabLoginManager.LoginWithDeviceID();
-
-        // StartCoroutine(InitializeTitle());
         InitializeTitle();
     }
 
@@ -68,105 +64,10 @@ public class TitleManager : MonoBehaviour
         if (userNameConfirmButton != null)
             userNameConfirmButton.onClick.AddListener(OnUserNameConfirmed);
 
-
-        // // まずPlayFabにログイン
-        // // playFabLoginManager.LoginWithDeviceID(success =>
-        // playFabLoginManager.LoginWithUserName(success =>
-        // {
-        //     if (success)
-        //     {
-        //         // ログイン成功
-        //         Debug.Log("ログインに成功しました");
-        //     }
-        //     else
-        //     {
-        //         Debug.LogError("ログインに失敗しました");
-        //     }
-        // });
-
-        // // ログインが完了するまで待機
-        // yield return null;
-
         if (userNameInput != null)
         {
             // プレイヤーの名前をロードして表示
             userNameInput.text = PlayerPrefs.GetString("userName", "");
-
-            // if(userNameInput.text != "") {
-            //     // まずPlayFabにログイン
-            //     // playFabLoginManager.LoginWithDeviceID(success =>
-            //     playFabLoginManager.LoginWithUserName(success =>
-            //     {
-            //         if (success)
-            //         {
-            //             // ログイン成功
-            //             Debug.Log("ログインに成功しました");
-            //         }
-            //         else
-            //         {
-            //             Debug.LogError("ログインに失敗しました");
-            //         }
-            //     });
-            //     // ログインが完了するまで待機
-            //     yield return null;
-
-            //     StartCoroutine(SetDiary(userNameInput.text));
-            // }
-            // if(userNameInput.text != "") 
-            // {
-            //     bool isLoginComplete = false;
-            //     bool isLoginSuccess = false;
-
-            //     // ログイン処理を開始
-            //     playFabLoginManager.LoginWithUserName(success =>
-            //     {
-            //         isLoginSuccess = success;
-            //         isLoginComplete = true;
-                    
-            //         if (success)
-            //         {
-            //             Debug.Log("ログインに成功しました");
-            //         }
-            //         else
-            //         {
-            //             Debug.LogError("ログインに失敗しました");
-            //         }
-            //     });
-
-            //     // ログインが完了するまで待機
-            //     while (!isLoginComplete)
-            //     {
-            //         yield return null;
-            //     }
-
-            //     // ログイン成功時のみ次の処理へ
-            //     if (isLoginSuccess)
-            //     {
-            //         yield return StartCoroutine(SetDiary(userNameInput.text));
-            //     }
-            // }
-            // // 名前が入っていれば、ともハムの日記も表示する
-            // if (diaryDisplayText != null && userNameInput.text != "")
-            // {
-            //     List<string> diaryList = new List<string>();
-            //     diaryList = SaveDao.LoadData(
-            //         userNameInput.text,
-            //         PlayerData => PlayerData.friendHamMemory
-            //     );
-            //     // 最後の日記1件を表示
-            //     if (diaryList.Count > 0)
-            //     {
-            //         diaryDisplayText.text = diaryList[diaryList.Count - 1];
-            //     }
-            //     else
-            //     {
-            //         diaryDisplayText.text = "ともハムの日記:\nまだ日記はありません。";
-            //     }
-            // }
-            // else if (diaryDisplayText != null)
-            // {
-            //     diaryDisplayText.text = "ともハムの日記:\n名前を入力してね！";
-            // }
         }
             
         // BGMの設定と再生
@@ -188,8 +89,6 @@ public class TitleManager : MonoBehaviour
                 PlayerData => PlayerData.friendHamMemory
             );
             Debug.Log(diaryList);
-            // // ここおかしい？
-            // yield return null; // データのロードを待機
             // 最後の日記1件を表示
             if (diaryList != null && diaryList.Count > 0)
             {
@@ -202,7 +101,7 @@ public class TitleManager : MonoBehaviour
         }
         else if (diaryDisplayText != null)
         {
-            diaryDisplayText.text = "ともハムの日記:\n名前を入力してね！";
+            diaryDisplayText.text = "なまえをいれてログインしてね";
         }
     }
     
@@ -373,6 +272,7 @@ public class TitleManager : MonoBehaviour
             {
                 // ログイン成功
                 Debug.Log("ログインに成功しました");
+                // 日記の更新
                 SetDiary(userName);
             }
             else
@@ -380,9 +280,6 @@ public class TitleManager : MonoBehaviour
                 Debug.LogError("ログインに失敗しました");
             }
         });
-
-
-        // 日記の更新
     }
     
     private void SaveSettings()

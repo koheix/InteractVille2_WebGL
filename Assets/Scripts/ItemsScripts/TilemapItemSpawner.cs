@@ -9,7 +9,7 @@ public class TilemapItemSpawner : MonoBehaviour
     [SerializeField] private GameObject itemPrefab; // アイテムのプレハブ
     
     [Header("スポーン設定")]
-    [SerializeField] private int itemCount = 10;
+    [SerializeField] private int itemCount = 15;
     [SerializeField] private float itemHeight = 0.5f; // タイルより少し上
     [SerializeField] private int maxSpawnAttempts = 200;
     

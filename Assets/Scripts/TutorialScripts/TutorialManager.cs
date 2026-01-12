@@ -11,8 +11,10 @@ public class TutorialManager : MonoBehaviour
     public TextMeshProUGUI tutorialText;
     public Button nextButton;
 
+    public string tutorialSceneName = "MainGameScene";
+
     // チュートリアルのステップ(ともハムの説明は初めて家に入ったときに行う？)
-    protected List<string> tutorialSteps = new List<string>()
+    public List<string> tutorialSteps = new List<string>()
     {
         "Interact Ville2へようこそ!\n簡単な説明をはじめます。",
         "この森には、あなたが好きな友達のハムスター、「ともハム」が住んでいます。\nともハムはあなたとの会話が大好きです。",
@@ -32,15 +34,23 @@ public class TutorialManager : MonoBehaviour
     {
         // チュートリアルが完了していない場合、チュートリアルを開始する
         // bool isTutorialCompleted = SaveDao.LoadData<bool>("Player1", data => data.isTutorialCompleted);
-        
-        bool isTutorialCompleted = SaveDao.LoadData<bool>(PlayerPrefs.GetString("userName", "default"), data => data.isTutorialCompleted);
+        bool isTutorialCompleted = false;
+        if(tutorialSceneName == "MainGameScene"){
+            isTutorialCompleted = SaveDao.LoadData<bool>(PlayerPrefs.GetString("userName", "default"), data => data.isTutorialCompleted);
+        }
+        else if(tutorialSceneName == "HouseScene")
+        {
+            isTutorialCompleted = SaveDao.LoadData<bool>(PlayerPrefs.GetString("userName", "default"), data => data.isFriendHamHouseTutorialCompleted);
+        }
         if (!isTutorialCompleted)
         {
             StartTutorial();
+            InputController.Instance.DisableMovement();
         }else
         {
             tutorialCanvas.SetActive(false);
             Debug.Log("Tutorial already completed.");
+            InputController.Instance.EnableMovement();
         }
         
     }
@@ -64,8 +74,16 @@ public class TutorialManager : MonoBehaviour
 
         // チュートリアル完了後の処理
         tutorialCanvas.SetActive(false);
-        SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"),  data => data.isTutorialCompleted = true);
+        if(tutorialSceneName == "MainGameScene"){
+            SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"),  data => data.isTutorialCompleted = true);
+        }
+        else if(tutorialSceneName == "HouseScene")
+        {
+            SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"),  data => data.isFriendHamHouseTutorialCompleted = true);
+        }
         Debug.Log("Tutorial completed.");
+        // 動けるようにする
+        InputController.Instance.EnableMovement();
     }
     
 }

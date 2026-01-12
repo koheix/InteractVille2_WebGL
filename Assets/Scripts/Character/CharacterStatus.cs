@@ -23,6 +23,7 @@ public class CharacterStatus : MonoBehaviour
     //リンゴの数
     // public static int appleCount;
     // public int appleCount;
+    // public static int appleCount;
     private int appleCount;
 
     // 停止時のhunger回復用
@@ -36,6 +37,7 @@ public class CharacterStatus : MonoBehaviour
         cc = GetComponent<CharacterController>();
         // 体力のロード
         hunger = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.hunger);
+        appleCount =  SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.appleCount);
         // シーンチェンジ後も体力を維持するため
         UpdateHungerUI();
         UpdateAppleCountUI();
@@ -122,7 +124,7 @@ public class CharacterStatus : MonoBehaviour
     // apple countのUIを更新するメソッド
     private void UpdateAppleCountUI()
     {
-        appleCount = CollectibleItem.appleCount;
+        appleCount = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.appleCount);
         appleCountUI.text = appleCount.ToString();
     }
 

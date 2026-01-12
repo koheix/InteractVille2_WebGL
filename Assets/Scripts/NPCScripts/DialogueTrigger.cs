@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 
 /**
  * プレイヤーがNPCに近づいたときにダイアログを開始するトリガースクリプト
@@ -12,13 +13,19 @@ public class DialogueTrigger : MonoBehaviour
     private bool isPlayerInRange = false;
 
     [Header("UI Prompt")]
-    [SerializeField] private GameObject interactionPrompt; // "スペースで話す"の表示用
+    [SerializeField] private GameObject characterInteractionPrompt; // "スペースで話す"の表示用
     [SerializeField] private TextMeshProUGUI promptText;
+
+    // 押すと話すボタン
+    [SerializeField] private Button characterInteractionButton;
 
     void Start()
     {
         // 初期状態でプロンプトを非表示
         ShowInteractionUI(false);
+        // ボタンにイベントリスナーを追加
+        if (characterInteractionButton != null)
+            characterInteractionButton.onClick.AddListener(OnCharacterInteractionButton);
     }
 
     void Update()
@@ -67,13 +74,22 @@ public class DialogueTrigger : MonoBehaviour
     // プロンプトの表示・非表示を制御するメソッド
     private void ShowInteractionUI(bool show)
     {
-        if (interactionPrompt == null) return;
+        if (characterInteractionPrompt == null) return;
         
-        interactionPrompt.SetActive(show);
+        characterInteractionPrompt.SetActive(show);
         
         if (show && promptText != null)
         {
             promptText.text = "スペースで話す";
         }
+    }
+
+    // ボタンは当たり判定があるときにしか表示されない
+    private void OnCharacterInteractionButton()
+    {
+        dialogueSystem.StartDialogue();
+
+        // プロンプトを非表示
+        ShowInteractionUI(false);
     }
 }

@@ -169,7 +169,7 @@ public class SaveDao
     {
         string json = JsonUtility.ToJson(data, true);
         bool isDone = false;
-        bool isSuccess = false;
+        // bool isSuccess = false;
 
         var request = new UpdateUserDataRequest
         {
@@ -183,7 +183,7 @@ public class SaveDao
             result =>
             {
                 Debug.Log("データ保存成功");
-                isSuccess = true;
+                // isSuccess = true;
                 isDone = true;
             },
             error =>

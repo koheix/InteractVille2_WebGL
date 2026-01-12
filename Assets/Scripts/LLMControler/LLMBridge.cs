@@ -196,30 +196,6 @@ public class LLMBridge : MonoBehaviour
         public string text;
     }
 
-    // テスト
-    // private void Start()
-    // {
-    //     // StartCoroutine(ExampleUsage());
-    // }
-    // void Start()
-    // {
-    //     // 使用例
-    //     Debug.Log("Testing GetLLMStructuredOutputResponse...");
-    //     StartCoroutine(
-    //     GetLLMStructuredOutputResponse(
-    //         name: "return_calculation",
-    //         description: "Returns the result of a calculation",
-    //         "以下の記憶データから、ハムスターのValenceを算出してください。(0~100の範囲で数値を返してください）\n" +
-    //         "記憶データ:\n" +
-    //         "• こうへいくんという名前のユーザーで、親しみやすい関係性を築いている\n• 家族でアウトレットに出かけ、紺色のニットのトップスを購入した\n• 新しい服の購入を喜んでおり、ファッションに関心がある様子" +
-    //         "• こうへいくんとの楽しい会話の時間を共有し、お互いに幸せな気持ちになれる関係性を築いている\n• こうへいくんは「たのしいね」という素直で前向きな表現をする人柄である\n• 私たちの会話は温かく親しみやすい雰囲気で進行している" +
-    //         "申し訳ないのですが、今回が私たちの最初の会話です。\n\nこれまでの会話履歴は：\n1. あなたが「はなせる？」と質問\n2. 私が「話せるよ！こうへいくん、元気だった？」と返答\n\nまだ会話が始まったばかりで、要約できる重要な思い出や情報は蓄積されていません。もう少し会話を続けてから、改めて要約をお願いしていただけますか？" +
-    //         "• ユーザーは「こうへいくん」という名前で呼ばれることを好む\n• 日常的な挨拶として「こんにちは」を使用する\n• カジュアルで親しみやすいコミュニケーションスタイルを好む",
-    //         onComplete: result => Debug.Log(result),
-    //         onError: error => Debug.LogError(error)
-    //     ));
-    // }
-
     // メッセージ履歴を管理するクラス
     [System.Serializable]
     public class ConversationHistory
@@ -259,18 +235,6 @@ public class LLMBridge : MonoBehaviour
             return string.Join("\n", messages.Take(messages.Count - 1).Select(m => $"{m.role}: {m.content}"));
         }
     }
-
-    // private IEnumerator ExampleUsage()
-    // {
-    //     Debug.Log("Sending request to Claude API...");
-
-    //     IEnumerator responseCoroutine = GetLLMResponse("元気ですか？");
-    //     yield return StartCoroutine(responseCoroutine);
-
-    //     // レスポンスの取得
-    //     string response = responseCoroutine.Current as string;
-    //     Debug.Log($"Claude Response: {response}");
-    // }
 
     // Structured Outputを使ったLLM応答を取得するmethod
     // とりあえず数値を返すものに対応
@@ -377,97 +341,4 @@ public class LLMBridge : MonoBehaviour
 
         webRequest.Dispose();
     }
-
-    // // Structured Outputを使ったLLM応答を取得するmethod
-    // // stringを返すものに対応
-    // public IEnumerator GetLLMStructuredOutputStringResponse(string name, string description, string question, Action<string> onComplete, Action<string> onError)
-    // {
-    //     // ツールの定義
-    //     ClaudeTool[] tools = new ClaudeTool[]
-    //     {
-    //         new ClaudeTool
-    //         {
-    //             name = name,
-    //             description = description,
-    //             input_schema = new ToolInputSchema
-    //             {
-    //                 type = "object",
-    //                 properties = new ToolProperties
-    //                 {
-    //                     result = new ToolProperty
-    //                     {
-    //                         type = "string",
-    //                         description = "The string result"
-    //                     }
-    //                 },
-    //                 required = new string[] { "result" }
-    //             }
-    //         }
-    //     };
-
-    //     // リクエストの作成
-    //     ClaudeRequest request = new ClaudeRequest
-    //     {
-    //         model = "claude-sonnet-4-20250514",
-    //         max_tokens = 1024,
-    //         messages = new Message[]
-    //         {
-    //             new Message
-    //             {
-    //                 role = "user",
-    //                 content = question
-    //             }
-    //         },
-    //         tools = tools
-    //     };
-
-    //     string jsonRequest = JsonUtility.ToJson(request);
-    //     // リクエストボディの表示（デバッグ用）
-    //     Debug.Log($"Request Body(Structured output): {jsonRequest}");
-
-    //     // UnityWebRequestの作成
-    //     UnityWebRequest webRequest = new UnityWebRequest(CLAUDE_API_URL, "POST");
-    //     byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonRequest);
-    //     webRequest.uploadHandler = new UploadHandlerRaw(bodyRaw);
-    //     webRequest.downloadHandler = new DownloadHandlerBuffer();
-
-    //     // ヘッダーの設定
-    //     webRequest.SetRequestHeader("Content-Type", "application/json");
-    //     webRequest.SetRequestHeader("x-api-key", PlayerPrefs.GetString("APIKey"));
-    //     webRequest.SetRequestHeader("anthropic-version", CLAUDE_VERSION);
-    //     // リクエスト送信
-    //     yield return webRequest.SendWebRequest();
-    //     if (webRequest.result == UnityWebRequest.Result.Success)
-    //     {
-    //         string responseText = webRequest.downloadHandler.text;
-    //         ClaudeResponse response = JsonUtility.FromJson<ClaudeResponse>(responseText);
-
-    //         // ツール使用のブロックを探す
-    //         bool found = false;
-    //         foreach (var block in response.content)
-    //         {
-    //             if (block.type == "tool_use" && block.name == name)
-    //             {
-    //                 Debug.Log($"Structured Output Result: {block.input.result}");
-    //                 string result = block.input.result.ToString();
-    //                 onComplete?.Invoke(result);
-    //                 found = true;
-    //                 break;
-    //             }
-    //         }
-
-    //         if (!found)
-    //         {
-    //             onError?.Invoke("Tool use not found in response");
-    //         }
-    //     }
-    //     else
-    //     {
-    //         string errorMessage = $"Error: {webRequest.error}\nResponse: {webRequest.downloadHandler.text}";
-    //         Debug.LogError(errorMessage);
-    //         onError?.Invoke(errorMessage);
-    //     }
-    //     webRequest.Dispose();
-    // }
-
 }

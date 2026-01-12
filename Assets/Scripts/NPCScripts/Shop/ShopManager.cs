@@ -19,8 +19,8 @@ public class ShopManager : MonoBehaviour
     // public Button buyBoxYesButton;
     // public Button buyBoxNoButton;
 
-    [Header("Inventory Reference")]
-    public PlayerInventory playerInventory;
+    // [Header("Inventory Reference")]
+    private PlayerInventory playerInventory;
 
     void Start()
     {

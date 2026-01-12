@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
 using TMPro;
+using UnityEngine.UI;
 
 public class DoorTrigger : MonoBehaviour
 {
@@ -21,12 +22,18 @@ public class DoorTrigger : MonoBehaviour
     // Interaction UI
     [SerializeField] private GameObject interactionPrompt;
     [SerializeField] private TextMeshProUGUI promptText;
+    // 押すと移動するボタン
+    [SerializeField] private Button interactionButton;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     private void Start()
     {
         GetComponent<Collider2D>().isTrigger = true;
         prevSceneName = SceneManager.GetActiveScene().name;
+
+        // ボタンにイベントリスナーを追加
+        if (interactionButton != null)
+            interactionButton.onClick.AddListener(OnInteractionButton);
 
         // ヒントを非表示
         interactionPrompt.SetActive(false);
@@ -90,5 +97,11 @@ public class DoorTrigger : MonoBehaviour
         {
             promptText.text = "スペースで移動";
         }
+    }
+
+    // ボタンは当たり判定があるときにしか表示されない
+    private void OnInteractionButton()
+    {
+        StartCoroutine(ChangeScene());
     }
 }

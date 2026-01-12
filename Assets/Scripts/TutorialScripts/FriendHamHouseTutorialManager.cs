@@ -35,10 +35,12 @@ public class FriendHamHouseTutorialManager : MonoBehaviour
         if (!isTutorialCompleted)
         {
             StartTutorial();
+            InputController.Instance.DisableMovement();
         }else
         {
             tutorialCanvas.SetActive(false);
             Debug.Log("Friend Ham House Tutorial already completed.");
+            InputController.Instance.EnableMovement();
         }
         
     }
@@ -64,6 +66,8 @@ public class FriendHamHouseTutorialManager : MonoBehaviour
         tutorialCanvas.SetActive(false);
         SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"),  data => data.isFriendHamHouseTutorialCompleted = true);
         Debug.Log("Friend Ham House Tutorial completed.");
+        // 動けるようにする
+        InputController.Instance.EnableMovement();
     }
     
 }

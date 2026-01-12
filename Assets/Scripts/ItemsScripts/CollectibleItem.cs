@@ -19,14 +19,18 @@ public class CollectibleItem : MonoBehaviour
     private Vector3 startPosition;
     private bool isCollected = false;
 
-    public static int appleCount =  SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.appleCount);
+    // ここ良くないよね？
+    // ここが原因
+    // public static int appleCount;
+    private int appleCount;
     
     void Start()
     {
+        // appleCount = CharacterStatus.appleCount;
+        appleCount = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.appleCount);
         startPosition = transform.position;
 
         // appleCount = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.appleCount);
-        Debug.Log("CollectibleItem Start appleCount: " + appleCount);
     }
     
     void Update()
