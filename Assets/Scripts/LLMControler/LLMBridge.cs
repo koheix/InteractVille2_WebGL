@@ -6,10 +6,11 @@ using UnityEngine.Networking;
 using System.Collections.Generic;
 using System.Linq;
 
-
 public class LLMBridge : MonoBehaviour
 {
-    private const string CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
+    // フロントでAPIキーを載せないようにプロキシサーバを利用
+    // private const string CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
+    private const string CLAUDE_API_URL = "https://llm-proxy.grapeoxygen.workers.dev";
     private const string CLAUDE_VERSION = "2023-06-01";
 
     // Structured Output用のクラス
@@ -110,7 +111,8 @@ public class LLMBridge : MonoBehaviour
             request.downloadHandler = new StreamingDownloadHandler(onPartialResponse);
 
             request.SetRequestHeader("Content-Type", "application/json");
-            request.SetRequestHeader("x-api-key", PlayerPrefs.GetString("APIKey"));
+            // プロキシサーバに載せてもらうため不要
+            // request.SetRequestHeader("x-api-key", PlayerPrefs.GetString("APIKey"));
             request.SetRequestHeader("anthropic-version", CLAUDE_VERSION);
 
             yield return request.SendWebRequest();
@@ -294,7 +296,8 @@ public class LLMBridge : MonoBehaviour
 
         // ヘッダーの設定
         webRequest.SetRequestHeader("Content-Type", "application/json");
-        webRequest.SetRequestHeader("x-api-key", PlayerPrefs.GetString("APIKey"));
+        // プロキシサーバに載せてもらうため不要
+        // webRequest.SetRequestHeader("x-api-key", PlayerPrefs.GetString("APIKey"));
         webRequest.SetRequestHeader("anthropic-version", CLAUDE_VERSION);
 
         // リクエスト送信
