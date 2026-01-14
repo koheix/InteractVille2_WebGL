@@ -37,15 +37,15 @@ public class InventoryToggle : MonoBehaviour
         }
     }
 
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.E))
-        {
-            // isOpen = !isOpen;
-            // inventoryPanel.SetActive(isOpen);
-            toggleInventory();
-        }
-    }
+    // void Update()
+    // {
+    //     if (Input.GetKeyDown(KeyCode.E))
+    //     {
+    //         // isOpen = !isOpen;
+    //         // inventoryPanel.SetActive(isOpen);
+    //         toggleInventory();
+    //     }
+    // }
 
     // インベントリオープンボタンを押したときの処理
     private void OnInventoryToggleButtonClicked()

@@ -67,18 +67,45 @@ public class FriendHamItemManager : MonoBehaviour
     // }
 
     // インベントリデータの読み込み
+    // private void LoadInventoryData()
+    // {
+    //     Debug.Log("インベントリデータを読み込み中...");
+    //     string userName = PlayerPrefs.GetString("userName", "default");
+
+    //     // インベントリの読み込みと変換
+    //     // List<InventorySlot> inventoryData = SaveDao.LoadData(userName, data => data.inventoryItems);
+    //     // inventoryItems = inventoryData.ToDictionary(slot => slot.item, slot => slot.count);
+    //     // nullは除外する
+    //     // inventoryItems = inventoryData.Where(slot => slot.itemName != null) .ToDictionary(slot => slot.itemName, slot => slot.count);
+    //     //
+    //     inventoryItems = playerInventory.GetInventoryDictionary();
+    //     items = new List<string>(inventoryItems.Keys);
+    //     // デバッグ表示
+    //     foreach (var item in items)
+    //     {
+    //         Debug.Log($"Loaded item: {item}");
+    //     }
+
+    //     // インベントリUIの更新
+    //     // PopulateInventory(inventoryPanel, itemButtonPrefab, items.Count);
+    //     PopulateInventory(presentBoxListPanel, itemButtonPrefab, inventoryItems.Count);
+
+    //     Debug.Log("インベントリデータの読み込み完了");
+    // }
+
     private void LoadInventoryData()
     {
-        Debug.Log("インベントリデータを読み込み中...");
+        Debug.Log("インベントリデータを読み込み中...(FriendHamItemManager)");
         string userName = PlayerPrefs.GetString("userName", "default");
-
+        // PlayerData data = SaveDao.LoadStructData(userName);
+        // items = new List<ItemData>(data.inventoryItems);
         // インベントリの読み込みと変換
-        // List<InventorySlot> inventoryData = SaveDao.LoadData(userName, data => data.inventoryItems);
+        List<InventorySlot> inventoryData = SaveDao.LoadData(userName, data => data.inventoryItems);
         // inventoryItems = inventoryData.ToDictionary(slot => slot.item, slot => slot.count);
         // nullは除外する
-        // inventoryItems = inventoryData.Where(slot => slot.itemName != null) .ToDictionary(slot => slot.itemName, slot => slot.count);
+        inventoryItems = inventoryData.Where(slot => slot.itemName != null) .ToDictionary(slot => slot.itemName, slot => slot.count);
         //
-        inventoryItems = playerInventory.GetInventoryDictionary();
+        // inventoryItems = new Dictionary<ItemData, int>(data.inventoryItems);
         items = new List<string>(inventoryItems.Keys);
         // デバッグ表示
         foreach (var item in items)
@@ -90,7 +117,7 @@ public class FriendHamItemManager : MonoBehaviour
         // PopulateInventory(inventoryPanel, itemButtonPrefab, items.Count);
         PopulateInventory(presentBoxListPanel, itemButtonPrefab, inventoryItems.Count);
 
-        Debug.Log("インベントリデータの読み込み完了");
+        Debug.Log("インベントリデータの読み込み完了(FriendHamItemManager)");
     }
 
     // ともハムのインベントリデータの読み込み
