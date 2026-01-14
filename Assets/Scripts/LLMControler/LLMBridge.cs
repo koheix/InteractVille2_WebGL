@@ -90,29 +90,67 @@ public class LLMBridge : MonoBehaviour
     /// <param name="APIKey">Claude APIキー</param>
     /// <returns>Claude APIからのレスポンステキスト</returns>
     // ストリーミング対応版
-    public IEnumerator GetLLMResponse(string systemMessage, Message[] messages, System.Action<string> onPartialResponse = null, bool stream = true)
+    // public IEnumerator GetLLMResponse(string systemMessage, Message[] messages, System.Action<string> onPartialResponse = null, bool stream = true)
+    // {
+    //     ClaudeRequest requestData = new ClaudeRequest
+    //     {
+    //         system = systemMessage,
+    //         messages = messages,  // 履歴全体を送信
+    //         stream = true
+    //     };
+
+
+    //     string jsonData = JsonUtility.ToJson(requestData);
+    //     byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
+    //     // リクエストボディの表示（デバッグ用）
+    //     Debug.Log($"Request Body: {jsonData}");
+
+    //     using (UnityWebRequest request = new UnityWebRequest(CLAUDE_API_URL, "POST"))
+    //     {
+    //         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+    //         request.downloadHandler = new StreamingDownloadHandler(onPartialResponse);
+
+    //         request.SetRequestHeader("Content-Type", "application/json");
+    //         // プロキシサーバに載せてもらうため不要
+    //         // request.SetRequestHeader("x-api-key", PlayerPrefs.GetString("APIKey"));
+    //         request.SetRequestHeader("anthropic-version", CLAUDE_VERSION);
+
+    //         yield return request.SendWebRequest();
+
+    //         if (request.result != UnityWebRequest.Result.Success)
+    //         {
+    //             Debug.LogError($"Claude API Error: {request.error}");
+    //             yield return $"Error: {request.error}";
+    //             yield break;
+    //         }
+
+    //         yield return ((StreamingDownloadHandler)request.downloadHandler).GetFullText();
+    //     }
+    // }
+
+    // プロキシでストリーミングがうまくいかないので疑似ストリーミング
+    public IEnumerator GetLLMResponse(
+        string systemMessage,
+        Message[] messages,
+        System.Action<string> onPartialResponse = null
+    )
     {
         ClaudeRequest requestData = new ClaudeRequest
         {
             system = systemMessage,
-            messages = messages,  // 履歴全体を送信
-            stream = true
+            messages = messages,
+            stream = false   
         };
-
 
         string jsonData = JsonUtility.ToJson(requestData);
         byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
-        // リクエストボディの表示（デバッグ用）
-        Debug.Log($"Request Body: {jsonData}");
 
         using (UnityWebRequest request = new UnityWebRequest(CLAUDE_API_URL, "POST"))
         {
             request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            request.downloadHandler = new StreamingDownloadHandler(onPartialResponse);
+            request.downloadHandler = new DownloadHandlerBuffer();
 
             request.SetRequestHeader("Content-Type", "application/json");
-            // プロキシサーバに載せてもらうため不要
-            // request.SetRequestHeader("x-api-key", PlayerPrefs.GetString("APIKey"));
             request.SetRequestHeader("anthropic-version", CLAUDE_VERSION);
 
             yield return request.SendWebRequest();
@@ -120,13 +158,41 @@ public class LLMBridge : MonoBehaviour
             if (request.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError($"Claude API Error: {request.error}");
-                yield return $"Error: {request.error}";
                 yield break;
             }
 
-            yield return ((StreamingDownloadHandler)request.downloadHandler).GetFullText();
+            string responseText = request.downloadHandler.text;
+
+            // Claudeの通常レスポンスをパース
+            ClaudeResponse response =
+                JsonUtility.FromJson<ClaudeResponse>(responseText);
+
+            string fullText = response.content[0].text;
+
+            // 疑似ストリーミング
+            yield return StartCoroutine(
+                PseudoStreaming(fullText, onPartialResponse)
+            );
         }
     }
+
+    private IEnumerator PseudoStreaming(
+        string text,
+        System.Action<string> onPartialResponse,
+        float interval = 0.03f   // 表示速度（好みで調整）
+    )
+    {
+        StringBuilder buffer = new StringBuilder();
+
+        foreach (char c in text)
+        {
+            buffer.Append(c);
+            onPartialResponse?.Invoke(buffer.ToString());
+            yield return new WaitForSeconds(interval);
+        }
+    }
+
+
 
     // カスタムDownloadHandler
     public class StreamingDownloadHandler : DownloadHandlerScript
