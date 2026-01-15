@@ -72,6 +72,9 @@ public class PlayerData
 
     public string friendHamCurrentMood = "普通";
 
+    // ともハムと会話した時間(1時間にn回までの判定に使用)
+    public List<long> speakHistoryLong = new List<long>();
+
     // プレゼントとか家具配置の思い出リスト(固定文字列で管理、（）で末端に時間記録) 
     public List<string> friendHamActivityMemory = new List<string>();
     public List<string> friendHamMemory = new List<string>();
@@ -87,6 +90,7 @@ public class PlayerData
 
     // ともハムハウスでのチュートリアル完了フラグ
     public bool isFriendHamHouseTutorialCompleted = false;
+
 }
 
 

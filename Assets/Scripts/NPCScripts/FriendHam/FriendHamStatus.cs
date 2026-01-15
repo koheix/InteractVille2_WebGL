@@ -6,6 +6,7 @@
  */
 
 using UnityEngine;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -59,6 +60,14 @@ public class FriendHamStatus : MonoBehaviour
         set { currentMood = value; }
     }
 
+    // ともハムと1時間に喋れる回数
+    private int MAX_SPEAKS_PER_HOUR = 5;
+    // ともハムと会話した履歴
+    public List<DateTime> speakHistory = new List<DateTime>();
+    public List<long> speakHistoryLong;
+
+    private bool canSpeak = false;
+
     // memory(ともハムの記憶を保存するための文字列リスト)
     // ゲームが終了するときに保存する(SaveDaoを使う)
     // public List<string> memory = new List<string>();
@@ -76,6 +85,16 @@ public class FriendHamStatus : MonoBehaviour
         hunger = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamHunger);
         closeness = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamCloseness);
         currentMood = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamCurrentMood);
+
+        // 話せる回数は親密度によって増える
+        MAX_SPEAKS_PER_HOUR += closeness / 10;
+        
+        speakHistoryLong = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistoryLong);
+        foreach (var tick in speakHistoryLong)
+        {
+            speakHistory.Add(DateTime.FromBinary(tick));
+        }
+
         UpdateMoodUI();
         UpdateClosenessUI();
         // Debug.Log($"FriendHamStatus: Loaded memory count = {memory.Count}, Valence={Valence}, Arousal={Arousal}, Hunger={Hunger}");
@@ -134,12 +153,32 @@ public class FriendHamStatus : MonoBehaviour
 
     public IEnumerator Speak(string message, System.Action<string> onUpdate, System.Action<string> onComplete = null)
     {
+        string finalResponse = "";
+        // ともハムと喋れるかを判定(1時間にMAX_SPEAKS_PER_HOUR回しか発話できない)
+        yield return checkSpeak();
+
+        // 会話時間リスト保存
+        speakHistoryLong.Clear();
+        foreach (var dt in speakHistory)
+        {
+            speakHistoryLong.Add(dt.ToBinary());
+        }
+        SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistoryLong = speakHistoryLong);
+        // 話せないならbreakする
+        if (!canSpeak)
+        {
+            Debug.Log("yield break");
+            finalResponse = "ぼくとは1時間に"+ MAX_SPEAKS_PER_HOUR + "回しか話せないみたい...!";
+            onUpdate?.Invoke(finalResponse);
+            onComplete?.Invoke(finalResponse);
+            yield break;
+        }
         Debug.Log("[Friend Ham]Sending request to Claude API...");
+        
 
         // ユーザーメッセージを履歴に追加
         conversationHistory.AddUserMessage(message);
 
-        string finalResponse = "";
 
         IEnumerator responseCoroutine = llmBridge.GetLLMResponse(
             "あなたは親しみやすい友達のハムスターです。\n" +
@@ -190,6 +229,62 @@ public class FriendHamStatus : MonoBehaviour
         foreach (var msg in conversationHistory.messages)
         {
             Debug.Log($"{msg.role}: {msg.content}");
+        }
+    }
+
+    private IEnumerator checkSpeak()
+    {
+
+        // 発話時間のリストを取得
+        speakHistoryLong = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistoryLong);
+        speakHistory.Clear();
+        foreach (var tick in speakHistoryLong)
+        {
+            speakHistory.Add(DateTime.FromBinary(tick));
+        }
+        if(speakHistory == null) speakHistory = new List<DateTime>();
+
+        canSpeak = false;
+        bool isWaiting = true;
+
+        TimeUtil.GetSafeDateTime(
+            serverTime =>
+            {
+                // 現在時刻を取得
+                DateTime now = serverTime;
+                Debug.Log(serverTime);
+                // 1時間以上前の発話時間データを削除
+                if(speakHistory != null)
+                {
+                    speakHistory.RemoveAll(t => (now - t).TotalMinutes >= 60);
+                }
+
+                // 話せる
+                if(speakHistory.Count < MAX_SPEAKS_PER_HOUR)
+                {
+                    // 今回の会話の時間を追加
+                    speakHistory.Add(now);
+                    canSpeak = true;
+                    Debug.Log("話せる");
+                }
+                else
+                {
+                    Debug.Log("会話回数上限を超えています。");
+                    canSpeak = false;
+                }
+                isWaiting = false;
+            },
+            error =>
+            {
+                Debug.LogError("playfab error:" + error.GenerateErrorReport());
+                canSpeak = false;
+                isWaiting = false;
+            }
+        );
+
+        while (isWaiting)
+        {
+            yield return null;
         }
     }
 
@@ -308,6 +403,9 @@ public class FriendHamStatus : MonoBehaviour
 
         // ここで履歴を保存する
         SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamMemory = memory);
+
+        // 会話時間のリストも保存
+        // SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistory = speakHistory);
     }
 
     // ゲーム終了時にValenceを保存する
