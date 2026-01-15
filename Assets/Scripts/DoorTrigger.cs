@@ -31,9 +31,9 @@ public class DoorTrigger : MonoBehaviour
         GetComponent<Collider2D>().isTrigger = true;
         prevSceneName = SceneManager.GetActiveScene().name;
 
-        // ボタンにイベントリスナーを追加
-        if (interactionButton != null)
-            interactionButton.onClick.AddListener(OnInteractionButton);
+        // // ボタンにイベントリスナーを追加
+        // if (interactionButton != null)
+        //     interactionButton.onClick.AddListener(OnInteractionButton);
 
         // ヒントを非表示
         interactionPrompt.SetActive(false);
@@ -41,6 +41,9 @@ public class DoorTrigger : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        // ボタンにイベントリスナーを追加
+        if (interactionButton != null)
+            interactionButton.onClick.AddListener(OnInteractionButton);
         if (other.CompareTag("Player"))
         {
             if (requireInput)
@@ -59,6 +62,8 @@ public class DoorTrigger : MonoBehaviour
 
     private void OnTriggerExit2D(Collider2D other)
     {
+        // 一度全部のイベントリスナーを削除
+        interactionButton.onClick.RemoveAllListeners();
         if (other.CompareTag("Player"))
         {
             playerInRange = false;
