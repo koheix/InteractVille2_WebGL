@@ -25,6 +25,17 @@ public class FriendHamStatus : MonoBehaviour
     [SerializeField] private TextMeshProUGUI moodText;
     [SerializeField] private Image closenessGauge;
     [SerializeField] private TextMeshProUGUI closenessGaugeText;
+    [SerializeField] private Transform remainingTurnsLayout;
+    [SerializeField] private TextMeshProUGUI remainingTurnsNumText;
+    [SerializeField] private TextMeshProUGUI maxTurnsNumText;
+
+    
+    
+    [Header("Remaining Turns Image Prefab Reference")]
+    [SerializeField] private GameObject remainingTurnsImagePrefab;
+
+    // 会話回数が回復する時間
+    private float recoveryDuration = 3600f; // 一時間
 
     // valence(0 ~ 100で表現し、getterとsetterで制御する)
     private int valence = 50;
@@ -94,9 +105,31 @@ public class FriendHamStatus : MonoBehaviour
         {
             speakHistory.Add(DateTime.FromBinary(tick));
         }
+        // 一時間以上前の発話データを削除
+        TimeUtil.GetSafeDateTime(
+            serverTime =>
+            {
+                // 現在時刻を取得
+                DateTime now = serverTime;
+                Debug.Log(serverTime);
+                // 1時間以上前の発話時間データを削除
+                if(speakHistory != null)
+                {
+                    speakHistory.RemoveAll(t => (now - t).TotalMinutes >= 60);
+                }
+            },
+            error =>
+            {
+                Debug.LogError("playfab error:" + error.GenerateErrorReport());
+            }
+        );
+
+
+
 
         UpdateMoodUI();
         UpdateClosenessUI();
+        UpdateRemainingTurnsUI();
         // Debug.Log($"FriendHamStatus: Loaded memory count = {memory.Count}, Valence={Valence}, Arousal={Arousal}, Hunger={Hunger}");
     }
     void OnEnable()
@@ -151,11 +184,73 @@ public class FriendHamStatus : MonoBehaviour
         closenessGaugeText.text = closeness.ToString() + "％";
     }
 
+    // 残りの発話回数のUIを更新するメソッド
+    private void UpdateRemainingTurnsUI()
+    {
+        // 残り回数と最大回数をセット
+        maxTurnsNumText.text = MAX_SPEAKS_PER_HOUR.ToString();
+        remainingTurnsNumText.text = (MAX_SPEAKS_PER_HOUR - speakHistory.Count).ToString();
+
+        // layoutの子要素を一つずつループで処理
+        foreach (Transform child in remainingTurnsLayout)
+        {
+            // オブジェクトを削除
+            Destroy(child.gameObject);
+        }
+
+
+        Image lastImage;
+        int generateNum = MAX_SPEAKS_PER_HOUR - speakHistory.Count;
+
+        // リストの数だけスロットを生成する
+        for(int i = 0;i < generateNum;i++)
+        {
+            Instantiate(remainingTurnsImagePrefab, remainingTurnsLayout);
+            // lastImage = obj.GetComponent<Image>(); 
+        }
+        GameObject obj = Instantiate(remainingTurnsImagePrefab, remainingTurnsLayout);
+        lastImage = obj.GetComponent<Image>(); 
+
+        // 現在時刻を取得
+        TimeUtil.GetSafeDateTime(
+            serverTime =>
+            {
+                // 現在時刻を取得
+                DateTime now = serverTime;
+                Debug.Log(serverTime);
+                // TimeSpan remaining = now - speakHistory[0];
+                // Debug.Log("remaining:" + remaining);
+                // float remainingSeconds = (float)remaining.TotalSeconds;
+                float remainingSeconds = (float)(now - speakHistory[0]).TotalSeconds;
+
+                if (remainingSeconds > 0)
+                {
+                    // 割合を計算 (1.0 - 残り時間/トータル時間)
+                    // 1時間で満タンになる計算
+                    float progress = 1.0f - (remainingSeconds / recoveryDuration);
+                    Debug.Log("progress:" + progress);
+                    lastImage.fillAmount = Mathf.Clamp01(progress);
+                }
+                
+            },
+            error =>
+            {
+                Debug.LogError("playfab error:" + error.GenerateErrorReport());
+            }
+        );
+
+
+
+    }
+
     public IEnumerator Speak(string message, System.Action<string> onUpdate, System.Action<string> onComplete = null)
     {
         string finalResponse = "";
         // ともハムと喋れるかを判定(1時間にMAX_SPEAKS_PER_HOUR回しか発話できない)
         yield return checkSpeak();
+
+        // 会話残り回数を反映する
+        UpdateRemainingTurnsUI();
 
         // 会話時間リスト保存
         speakHistoryLong.Clear();
@@ -212,6 +307,9 @@ public class FriendHamStatus : MonoBehaviour
         // memory.Add($"User: {message}");
         // memory.Add($"Assistant: {finalResponse}");
         DebugPrintConversation();
+
+        // // 会話残り回数を反映する
+        // UpdateRemainingTurnsUI();
 
         onComplete?.Invoke(finalResponse);
     }
