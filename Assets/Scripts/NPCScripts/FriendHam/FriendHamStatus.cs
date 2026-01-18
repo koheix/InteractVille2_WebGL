@@ -88,50 +88,107 @@ public class FriendHamStatus : MonoBehaviour
     private LLMBridge.ConversationHistory conversationHistory = new LLMBridge.ConversationHistory();
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        memory = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamMemory);
-        valence = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamValence);
-        arousal = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamArousal);
-        hunger = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamHunger);
-        closeness = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamCloseness);
-        currentMood = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamCurrentMood);
+    // void Start()
+    // {
+    //     memory = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamMemory);
+    //     valence = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamValence);
+    //     arousal = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamArousal);
+    //     hunger = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamHunger);
+    //     closeness = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamCloseness);
+    //     currentMood = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamCurrentMood);
 
-        // 話せる回数は親密度によって増える
-        MAX_SPEAKS_PER_HOUR += closeness / 10;
+    //     // 話せる回数は親密度によって増える
+    //     MAX_SPEAKS_PER_HOUR += closeness / 10;
         
-        speakHistoryLong = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistoryLong);
+    //     speakHistoryLong = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistoryLong);
+    //     foreach (var tick in speakHistoryLong)
+    //     {
+    //         speakHistory.Add(DateTime.FromBinary(tick));
+    //     }
+    //     // 一時間以上前の発話データを削除
+    //     TimeUtil.GetSafeDateTime(
+    //         serverTime =>
+    //         {
+    //             // 現在時刻を取得
+    //             DateTime now = serverTime;
+    //             Debug.Log(serverTime);
+    //             // 1時間以上前の発話時間データを削除
+    //             if(speakHistory != null)
+    //             {
+    //                 speakHistory.RemoveAll(t => (now - t).TotalMinutes >= 60);
+    //             }
+    //         },
+    //         error =>
+    //         {
+    //             Debug.LogError("playfab error:" + error.GenerateErrorReport());
+    //         }
+    //     );
+
+
+
+
+    //     UpdateMoodUI();
+    //     UpdateClosenessUI();
+    //     UpdateRemainingTurnsUI();
+    //     // Debug.Log($"FriendHamStatus: Loaded memory count = {memory.Count}, Valence={Valence}, Arousal={Arousal}, Hunger={Hunger}");
+    // }
+
+    public IEnumerator Start() 
+    {
+        string userName = PlayerPrefs.GetString("userName", "default");
+
+        // 各データのロード
+        memory = SaveDao.LoadData(userName, data => data.friendHamMemory);
+        valence = SaveDao.LoadData(userName, data => data.friendHamValence);
+        arousal = SaveDao.LoadData(userName, data => data.friendHamArousal);
+        hunger = SaveDao.LoadData(userName, data => data.friendHamHunger);
+        closeness = SaveDao.LoadData(userName, data => data.friendHamCloseness);
+        currentMood = SaveDao.LoadData(userName, data => data.friendHamCurrentMood);
+
+        // 親密度に基づく計算
+        MAX_SPEAKS_PER_HOUR += closeness / 10;
+
+        speakHistoryLong = SaveDao.LoadData(userName, data => data.speakHistoryLong);
+        speakHistory.Clear(); // 二重登録防止
         foreach (var tick in speakHistoryLong)
         {
             speakHistory.Add(DateTime.FromBinary(tick));
         }
-        // 一時間以上前の発話データを削除
+
+        // サーバー時刻の取得を「待機」する
+        bool isTimeProcessingDone = false;
+
         TimeUtil.GetSafeDateTime(
             serverTime =>
             {
-                // 現在時刻を取得
                 DateTime now = serverTime;
-                Debug.Log(serverTime);
-                // 1時間以上前の発話時間データを削除
-                if(speakHistory != null)
+                if (speakHistory != null)
                 {
                     speakHistory.RemoveAll(t => (now - t).TotalMinutes >= 60);
                 }
+                isTimeProcessingDone = true; 
             },
             error =>
             {
                 Debug.LogError("playfab error:" + error.GenerateErrorReport());
+                isTimeProcessingDone = true; // エラー時も進行を止めない
             }
         );
 
+        // 完了フラグが true になるまでループで待機（ここがポイント）
+        while (!isTimeProcessingDone)
+        {
+            yield return null; 
+        }
 
-
-
+        // 全てのデータ処理が終わってからUIを更新
         UpdateMoodUI();
         UpdateClosenessUI();
         UpdateRemainingTurnsUI();
-        // Debug.Log($"FriendHamStatus: Loaded memory count = {memory.Count}, Valence={Valence}, Arousal={Arousal}, Hunger={Hunger}");
+        
+        Debug.Log("すべての初期化とUI更新が完了しました");
     }
+
     void OnEnable()
     {
         Debug.Log("FriendHamStatus: Registering SaveMemory task to QuitManager");
@@ -221,15 +278,27 @@ public class FriendHamStatus : MonoBehaviour
                 // TimeSpan remaining = now - speakHistory[0];
                 // Debug.Log("remaining:" + remaining);
                 // float remainingSeconds = (float)remaining.TotalSeconds;
-                float remainingSeconds = (float)(now - speakHistory[0]).TotalSeconds;
 
-                if (remainingSeconds > 0)
+                // 1時間以内の会話履歴があれば最後のspeak turns UIの割合を計算して反映する
+                if(speakHistory.Count > 0)
                 {
-                    // 割合を計算 (1.0 - 残り時間/トータル時間)
-                    // 1時間で満タンになる計算
-                    float progress = 1.0f - (remainingSeconds / recoveryDuration);
-                    Debug.Log("progress:" + progress);
-                    lastImage.fillAmount = Mathf.Clamp01(progress);
+                    float remainingSeconds = (float)(now - speakHistory[0]).TotalSeconds;
+
+                    if (remainingSeconds > 0)
+                    {
+                        // 割合を計算 (1.0 - 残り時間/トータル時間)
+                        // 1時間で満タンになる計算
+                        float progress = remainingSeconds / 3600f; // 一時間をfullとして計算
+                        Debug.Log("progress:" + progress);
+                        if(progress >= 0.0f)
+                        {
+                            lastImage.fillAmount = Mathf.Clamp01(progress);                        
+                        }
+                        else
+                        {
+                            lastImage.fillAmount = Mathf.Clamp01(1.0f);
+                        }
+                    }
                 }
                 
             },
