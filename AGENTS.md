@@ -50,7 +50,7 @@ Assets/
   PlayFabSDK/ PlayFabEditorExtensions/ Joystick Pack/ "Sprout Lands - Sprites - Basic pack 1"/ TextMesh Pro/   ← 外部アセット
   Tests/EditMode/          EditMode テスト（asmdef: InteractVille2.LLM.Tests）
 server/llm-proxy/          LLM プロキシ（Cloudflare Workers）。公開 URL: https://llm-proxy.grapeoxygen.workers.dev
-  src/                     POST /chat（会話）・POST /score（スコア）・POST /（旧 API）
+  src/                     POST /chat（会話）・POST /score（スコア）
   test/                    vitest
   contract/                Unity と共有する API の契約（入力の上限、リクエスト・応答の例）
   wrangler.jsonc           モデル名・プロバイダ（LLM_PROVIDER）などの設定
@@ -206,8 +206,8 @@ Unity エディタからローカルのプロキシを使うときは、環境�
 
 ### LLM プロキシ（先にデプロイする）
 
-新しい WebGL ビルドは新しい API（`/chat`・`/score`）を使うので、**ビルドを公開する前に Worker をデプロイする**。
-Worker は旧 API（`POST /`）も残しているので、公開中の古いビルドはそのまま動く。
+API（`/chat`・`/score`）の形を変えるときは、**WebGL ビルドを公開する前に Worker をデプロイする**。
+形を変えない修正なら Worker だけをデプロイしてよい。
 
 ```powershell
 cd server\llm-proxy
@@ -216,13 +216,14 @@ npm test
 npx wrangler deploy    # 利用者の Cloudflare アカウントに反映される。実行前に利用者に確認する
 ```
 
-確認: `curl -X POST https://llm-proxy.grapeoxygen.workers.dev/chat -H "Content-Type: application/json" -d '{"system":"短く答えて","messages":[{"role":"user","content":"こんにちは"}]}'` が `{"text":...}` を返す。
+確認: `/chat` に `{"system":"短く答えて","messages":[{"role":"user","content":"こんにちは"}]}` を POST して `{"text":...}` が返る。
+Windows の Git Bash の `curl` は日本語の本文の文字コードが崩れることがあるので、Node の `fetch` などで確かめる。
 
 - **Claude に切り戻す**: `wrangler.jsonc` の `LLM_PROVIDER` を `"claude"` にしてデプロイする
-  （`CLAUDE_API_KEY` は secret として設定済み。未設定なら `npx wrangler secret put CLAUDE_API_KEY`）
+  - `CLAUDE_API_KEY` は secret（`npx wrangler secret put CLAUDE_API_KEY`）。キーを無効化した場合は、新しいキーを設定し直す
+  - `CLAUDE_MODEL` のモデルが廃止されていないか、切り戻す前に確かめる（`claude-sonnet-4-20250514` は廃止済み）
 - **モデルを変える**: `CHAT_MODEL`・`SCORE_MODEL` を変えてデプロイする。`SCORE_MODEL` は JSON Mode 対応モデルに限る
-- **旧 API を止める**: 新しい WebGL ビルドを公開して動作を確認したら、`LEGACY_CLAUDE_PASSTHROUGH` を `"false"` にしてデプロイし、
-  その後コード（`src/index.ts` の `legacyPassthrough`）を削除する
+  （JSON Mode の対応モデルの一覧は公式ドキュメントが古いことがある。`llama-3.1-8b-instruct` は一覧にあるが廃止済み）
 
 ### WebGL ビルド
 
