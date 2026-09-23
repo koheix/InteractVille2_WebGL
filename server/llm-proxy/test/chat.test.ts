@@ -108,7 +108,16 @@ describe('POST /chat（Claude に切り戻したとき）', () => {
   it('Claude の text ブロックを連結して返し、キー・バージョン・固定のモデルを付けて送る', async () => {
     const env = claudeEnv();
     const res = await call(env, '/chat', chatBody({ model: 'claude-opus-x', stream: true }), {
-      fetch: async () => claudeResponse({ content: [{ type: 'text', text: 'あ' }, { type: 'tool_use' }, { type: 'text', text: 'い' }] }),
+      // claude-sonnet-5 は本文の前に thinking ブロックを返す。思考の文章を台詞に混ぜないこと
+      fetch: async () =>
+        claudeResponse({
+          content: [
+            { type: 'thinking', thinking: '挨拶に答える', signature: 'sig' },
+            { type: 'text', text: 'あ' },
+            { type: 'tool_use' },
+            { type: 'text', text: 'い' },
+          ],
+        }),
     });
     expect(res.status).toBe(200);
     expect(res.json).toEqual({ text: 'あい' });

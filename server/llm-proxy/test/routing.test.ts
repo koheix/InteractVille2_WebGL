@@ -88,15 +88,16 @@ describe('削除した旧 API（Claude への素通し）', () => {
   const envWithOldSetting = () => ({ ...makeEnv(async () => responsesOutput('ok')), LEGACY_CLAUDE_PASSTHROUGH: 'true' });
 
   it.each([
-    ['ブラウザ（許可された Origin）', ORIGIN],
-    ['curl など（Origin ヘッダなし）', null],
-  ])('POST / は %s からでも 404 で、Claude も Workers AI も呼ばない（Claude の API キーを使う中継を誰にも使わせない）', async (_label, origin) => {
+    ['ブラウザ（許可された Origin）', ORIGIN, ORIGIN],
+    ['curl など（Origin ヘッダなし）', null, null],
+  ])('POST / は %s からでも 404 で、Claude も Workers AI も呼ばない（Claude の API キーを使う中継を誰にも使わせない）', async (_label, origin, allowOrigin) => {
     const env = envWithOldSetting();
     const res = await call(env, '/', legacyBody, { origin, headers: { 'anthropic-version': '2023-06-01' } });
     expect(res.status).toBe(404);
     expect(res.json).toEqual({ error: 'not_found' });
     expect(res.fetch).not.toHaveBeenCalled();
     expect(env.AI.run).not.toHaveBeenCalled();
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(allowOrigin);
   });
 
   it('/ へのプリフライトも 404 で、許可メソッド・許可ヘッダを返さず、CORS の Allow-Origin だけ付ける', async () => {
