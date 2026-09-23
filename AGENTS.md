@@ -39,7 +39,11 @@ Assets/
     TitleScripts/          タイトル、PlayFab ログイン、サウンド
     TutorialScripts/       チュートリアル
     Utils/                 SaveDao（PlayFab 保存）、TimeUtil（時刻）、ボタン判定
-  Prefabs/ Items/ Tiles/ Images/ Audio/ CharacterAnimation/ Resources/ Settings/
+    GameManager.cs         MainGameScene でのプレイヤーのスポーン位置
+    DoorTrigger.cs         ドアによるシーン移動
+    ButtonSoundEffect.cs   ボタンの効果音
+  Prefabs/ Items/ Tiles/ Images/ Audio/ CharacterAnimation/ CharacterUIImages/ Resources/ Settings/
+  FarmerAssets/            フォント・マテリアル・効果音・スプライト・タイル（外部アセットかどうかは要確認）
   PlayFabSDK/ PlayFabEditorExtensions/ Joystick Pack/ "Sprout Lands - Sprites - Basic pack 1"/ TextMesh Pro/   ← 外部アセット
 Packages/manifest.json    パッケージ
 ProjectSettings/          プロジェクト設定（ビルド対象シーンは EditorBuildSettings.asset）
@@ -149,8 +153,9 @@ PR 前の検証はこれだけを実行すればよい（`.claude/harness.json` 
 
 1. Unity Hub からこのプロジェクトを開く（または
    `& "C:\Program Files\Unity\Hub\Editor\6000.0.32f1\Editor\Unity.exe" -projectPath .`）
-2. `Assets/Scenes/TitleScene.unity` を開いて Play する
-   （起動シーンは `EditorBuildSettings` の先頭の `CommonUIScene`。`BootStrap` が共通 UI を用意する）
+2. `Assets/Scenes/CommonUIScene.unity` を開いて Play する
+   （`BootStrap` が常駐の共通 UI を読み込んでから TitleScene に移る。TitleScene から直接 Play すると
+   共通 UI が読み込まれないので、動作確認には使わない）
 3. 確認項目: タイトル表示 → ユーザー名でログイン → 村に移動できる → ともハムと会話できる
 
 LLM の会話はプロキシ（Cloudflare Workers）に接続できる環境でのみ動く。
