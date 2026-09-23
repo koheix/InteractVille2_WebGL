@@ -11,6 +11,16 @@
   },
   "checks": [
     {
+      "name": "LLM プロキシ（Worker）のテスト",
+      "command": ".\\.claude\\scripts\\checks\\vitest-tests.ps1 -Path server\\llm-proxy",
+      "timeoutMinutes": 10
+    },
+    {
+      "name": "LLM プロキシ（Worker）の型チェック",
+      "command": "npm --prefix server/llm-proxy run typecheck",
+      "timeoutMinutes": 5
+    },
+    {
       "name": "Unity EditMode テスト（コンパイル確認を含む）",
       "command": ".\\.claude\\scripts\\checks\\unity-tests.ps1 -Platform EditMode",
       "timeoutMinutes": 35
