@@ -13,10 +13,29 @@ const kindOf = (fn: () => unknown): string | undefined => {
 };
 
 describe('設定の読み込み', () => {
-  it('max_output_tokens は文字列の vars を数値に変換する', () => {
-    const config = readConfig(makeEnv());
+  it('vars の値（既定値と異なる値）を読み、トークン数は数値に変換する', () => {
+    const config = readConfig(
+      makeEnv(undefined, {
+        CHAT_MAX_OUTPUT_TOKENS: '2048',
+        CHAT_REASONING_EFFORT: 'medium',
+        CHAT_MODEL: '@cf/test/chat',
+        SCORE_MODEL: '@cf/test/score',
+        CLAUDE_MODEL: 'claude-test',
+      }),
+    );
+    expect(config).toMatchObject({
+      chatMaxOutputTokens: 2048,
+      chatReasoningEffort: 'medium',
+      chatModel: '@cf/test/chat',
+      scoreModel: '@cf/test/score',
+      claudeModel: 'claude-test',
+    });
+  });
+
+  it('トークン数と推論の強さが未設定なら 1024 と low', () => {
+    const config = readConfig(makeEnv(undefined, { CHAT_MAX_OUTPUT_TOKENS: undefined, CHAT_REASONING_EFFORT: undefined }));
     expect(config.chatMaxOutputTokens).toBe(1024);
-    expect(typeof config.chatMaxOutputTokens).toBe('number');
+    expect(config.chatReasoningEffort).toBe('low');
   });
 
   it('LLM_PROVIDER が未設定なら workers-ai', () => {

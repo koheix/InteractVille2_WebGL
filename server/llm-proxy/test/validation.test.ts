@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import limits from '../contract/limits.json';
 import { LIMITS } from '../src/validate';
-import { call, chatBody, makeEnv, responsesOutput } from './helpers';
+import { createHandler } from '../src/index';
+import { call, chatBody, makeEnv, ORIGIN, responsesOutput } from './helpers';
 
 const okEnv = () => makeEnv(async () => responsesOutput('ok'));
 
@@ -75,26 +76,62 @@ describe('POST /chat の入力検証', () => {
     await expectBadRequest('/chat', chatBody({ messages: messages(30001) }));
   });
 
-  it('文字数は UTF-16 のコード単位で数える（絵文字 10,000 個＝20,000 単位の system は通る）', async () => {
+  it('文字数は UTF-16 のコード単位で数える（絵文字 10,000 個＝20,000 単位は通り、10,001 個＝20,002 単位は 400）', async () => {
     const res = await call(okEnv(), '/chat', chatBody({ system: '😀'.repeat(10000) }));
     expect(res.status).toBe(200);
+    // コードポイントで数えると 10,001 で上限内になってしまうので、ここで数え方の違いが出る。
+    await expectBadRequest('/chat', chatBody({ system: '😀'.repeat(10001) }));
   });
 
   it('改行・引用符・制御文字・絵文字・孤立サロゲートを含む content も壊さずに渡す', async () => {
     const env = okEnv();
-    const content = '改行\n\tタブ "引用" \\ \u0000   😀 が \ud83d';
+    const content = '改行\n\tタブ "引用" \\ \u0000 \u2028 😀 か\u3099 \ud83d';
     const res = await call(env, '/chat', chatBody({ messages: [{ role: 'user', content }] }));
     expect(res.status).toBe(200);
     const input = (env.AI.run.mock.calls[0]?.[1] as { input: Array<{ content: string }> }).input;
     // 孤立サロゲートは JSON を経由すると U+FFFD になることがあるので、それ以外が一致することを確かめる。
-    expect(input[0]?.content.startsWith('改行\n\tタブ "引用" \\ \u0000   😀 が ')).toBe(true);
+    expect(input[0]?.content.startsWith('改行\n\tタブ "引用" \\ \u0000 \u2028 😀 か\u3099 ')).toBe(true);
   });
 
-  it('宣言された本文が 1MB を超えるなら読み込む前に 400', async () => {
+  it('Content-Length が 1,000,000 なら宣言だけでは弾かず、1,000,001 なら本文を読む前に 400', async () => {
     const env = okEnv();
-    const res = await call(env, '/chat', chatBody(), { headers: { 'Content-Length': String(10 * 1024 * 1024) } });
+    const atLimit = await call(env, '/chat', chatBody(), { headers: { 'Content-Length': '1000000' } });
+    expect(atLimit.status).toBe(200);
+
+    // 本文を読もうとすると例外を投げるリクエスト。宣言で弾けていれば読まれない。
+    const unreadable = new Request('https://llm-proxy.example.workers.dev/chat', {
+      method: 'POST',
+      headers: { Origin: ORIGIN, 'Content-Length': '1000001', 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    Object.defineProperty(unreadable, 'text', {
+      value: () => {
+        throw new Error('本文を読んではいけない');
+      },
+    });
+    const rejectEnv = okEnv();
+    const response = await createHandler({ fetch: async () => new Response('') })(unreadable, rejectEnv);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'bad_request' });
+    expect(rejectEnv.AI.run).not.toHaveBeenCalled();
+  });
+
+  it('Content-Length が無くても、実際の本文が 1,000,000 バイトを超えれば 400 で、AI を呼ばない', async () => {
+    const env = okEnv();
+    // 日本語を含むので、文字数ではなく UTF-8 のバイト数で水増し量を決める。
+    const baseBytes = new TextEncoder().encode(JSON.stringify(chatBody({ pad: '' }))).length;
+    // 本文全体がちょうど 1,000,001 バイトになるよう、ASCII の余分な項目で水増しする。
+    const padded = JSON.stringify(chatBody({ pad: 'a'.repeat(1_000_001 - baseBytes) }));
+    expect(new TextEncoder().encode(padded).length).toBe(1_000_001);
+
+    const res = await call(env, '/chat', padded);
     expect(res.status).toBe(400);
+    expect(res.json).toEqual({ error: 'bad_request' });
     expect(env.AI.run).not.toHaveBeenCalled();
+
+    const exact = JSON.stringify(chatBody({ pad: 'a'.repeat(1_000_000 - baseBytes) }));
+    expect(new TextEncoder().encode(exact).length).toBe(1_000_000);
+    expect((await call(okEnv(), '/chat', exact)).status).toBe(200);
   });
 });
 

@@ -47,7 +47,10 @@ describe('CORS', () => {
     const options = await call(env, '/chat', undefined, { origin, method: 'OPTIONS' });
     expect(post.status).toBe(403);
     expect(options.status).toBe(403);
+    expect(post.json).toEqual({ error: 'forbidden' });
+    expect(options.json).toEqual({ error: 'forbidden' });
     expect(post.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    expect(options.headers.get('Access-Control-Allow-Origin')).toBeNull();
     expect(env.AI.run).not.toHaveBeenCalled();
   });
 
@@ -96,6 +99,46 @@ describe('旧 API（公開中の古いビルド用）', () => {
     const res = await call(makeEnv(), '/', undefined, { method: 'OPTIONS' });
     expect(res.status).toBe(204);
     expect(res.headers.get('Access-Control-Allow-Headers')).toContain('anthropic-version');
+  });
+
+  it.each([
+    [429, '{"type":"error","error":{"type":"rate_limit_error"}}'],
+    [529, '{"type":"error","error":{"type":"overloaded_error"}}'],
+    [500, '{"type":"error"}'],
+  ])('上流が HTTP %i を返したら、そのステータスと本文をそのまま中継する（古いビルドは Claude の形式で読むため）', async (status, body) => {
+    const res = await call(makeEnv(), '/', legacyBody, { fetch: async () => claudeResponse(body, status) });
+    expect(res.status).toBe(status);
+    expect(res.text).toBe(body);
+  });
+
+  it('CLAUDE_API_KEY が無ければ Claude を呼ばずに 500 config（x-api-key: undefined を送らない）', async () => {
+    const res = await call(makeEnv(undefined, { CLAUDE_API_KEY: undefined }), '/', legacyBody);
+    expect(res.status).toBe(500);
+    expect(res.json).toEqual({ error: 'config' });
+    expect(res.fetch).not.toHaveBeenCalled();
+  });
+
+  it('Claude への接続に失敗したら 502 upstream（例外の文言は返さない）', async () => {
+    const res = await call(makeEnv(), '/', legacyBody, { fetch: async () => Promise.reject(new Error('dns failure sk-x')) });
+    expect(res.status).toBe(502);
+    expect(res.text).toBe('{"error":"upstream"}');
+  });
+
+  it.each([
+    ['配列', '[]'],
+    ['null', 'null'],
+    ['JSON でない', 'abc'],
+  ])('本文が%sなら 400 bad_request で、Claude を呼ばない', async (_label, raw) => {
+    const res = await call(makeEnv(), '/', raw);
+    expect(res.status).toBe(400);
+    expect(res.json).toEqual({ error: 'bad_request' });
+    expect(res.fetch).not.toHaveBeenCalled();
+  });
+
+  it('旧 API が無効なら、/chat のプリフライトは anthropic-version ヘッダを許可しない', async () => {
+    const res = await call(makeEnv(undefined, { LEGACY_CLAUDE_PASSTHROUGH: 'false' }), '/chat', undefined, { method: 'OPTIONS' });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type');
   });
 
   it.each(['false', 'TRUE', '1', undefined])('LEGACY_CLAUDE_PASSTHROUGH=%j なら 404 で、Claude を呼ばず、CORS ヘッダは付ける', async (value) => {

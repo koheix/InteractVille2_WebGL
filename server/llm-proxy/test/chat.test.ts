@@ -35,6 +35,16 @@ describe('POST /chat（Workers AI）', () => {
     });
   });
 
+  it('wrangler の vars を変えれば、Workers AI に渡すモデル・推論の強さ・トークン数（数値型）も変わる', async () => {
+    const env = makeEnv(async () => responsesOutput('ok'), {
+      CHAT_MODEL: '@cf/test/chat',
+      CHAT_REASONING_EFFORT: 'medium',
+      CHAT_MAX_OUTPUT_TOKENS: '2048',
+    });
+    await call(env, '/chat', chatBody());
+    expect(env.AI.run).toHaveBeenCalledWith('@cf/test/chat', expect.objectContaining({ reasoning: { effort: 'medium' }, max_output_tokens: 2048 }));
+  });
+
   it('messages に余分な項目があっても role と content だけを渡す', async () => {
     const env = makeEnv(async () => responsesOutput('ok'));
     await call(env, '/chat', chatBody({ messages: [{ role: 'user', content: 'a', name: 'x' }] }));

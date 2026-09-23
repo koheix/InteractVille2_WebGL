@@ -98,6 +98,27 @@ describe('POST /score（Claude に切り戻したとき）', () => {
     expect(body.model).toBe('claude-sonnet-4-20250514');
   });
 
+  it('SCORE_MODEL を変えれば、そのモデルで問い合わせる', async () => {
+    const env = makeEnv(async () => ({ response: { result: 10 } }), { SCORE_MODEL: '@cf/test/score' });
+    await call(env, '/score', scoreBody);
+    expect(env.AI.run.mock.calls[0]?.[0]).toBe('@cf/test/score');
+  });
+
+  it('Claude が 429 を返したら再試行せず、1 回だけ呼んで 503 busy', async () => {
+    const res = await call(claudeEnv(), '/score', scoreBody, { fetch: async () => claudeResponse({ error: {} }, 429) });
+    expect(res.status).toBe(503);
+    expect(res.json).toEqual({ error: 'busy' });
+    expect(res.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('return_score 以外の名前の tool_use は読まず、無効として扱う', async () => {
+    const res = await call(claudeEnv(), '/score', scoreBody, {
+      fetch: async () => claudeResponse({ content: [{ type: 'tool_use', name: 'other_tool', input: { result: 90 } }] }),
+    });
+    expect(res.status).toBe(502);
+    expect(res.json).toEqual({ error: 'invalid_score' });
+  });
+
   it('tool_use が無い応答は 1 回だけ再試行し、それでも無ければ 502 invalid_score', async () => {
     const res = await call(claudeEnv(), '/score', scoreBody, {
       fetch: async () => claudeResponse({ content: [{ type: 'text', text: '72です' }] }),
