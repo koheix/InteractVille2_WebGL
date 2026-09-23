@@ -1,0 +1,22 @@
+{
+  "$comment": "Unity と Worker の API の契約。両方のテストがこの例を使うので、項目名を片方だけ変えるとどちらかのテストが落ちる。",
+  "chatRequest": {
+    "system": "あなたは親しみやすい友達のハムスターです。",
+    "messages": [
+      { "role": "user", "content": "こんにちは！" },
+      { "role": "assistant", "content": "やあ！元気？" },
+      { "role": "user", "content": "りんごを10個集めたよ" }
+    ]
+  },
+  "chatSuccess": { "status": 200, "body": { "text": "すごいね、10個も！" } },
+  "scoreRequest": { "prompt": "以下の会話データから、ハムスターの感情価(Valence)を算出してください。" },
+  "scoreSuccess": { "status": 200, "body": { "result": 72 } },
+  "errors": [
+    { "status": 429, "body": { "error": "daily_quota" } },
+    { "status": 503, "body": { "error": "busy" } },
+    { "status": 502, "body": { "error": "invalid_score" } },
+    { "status": 502, "body": { "error": "upstream" } },
+    { "status": 400, "body": { "error": "bad_request" } },
+    { "status": 500, "body": { "error": "config" } }
+  ]
+}
