@@ -1,0 +1,20 @@
+{
+  "$comment": "このプロジェクト固有のハーネス設定。.claude 配下のフック・スクリプトはここだけを見てプロジェクトに合わせる。説明は .claude/README.md を参照。",
+  "defaultBranch": "main",
+  "protectedBranches": ["main", "master"],
+  "branchExample": "devel-<内容がわかる名前>",
+  "syncThrottleSeconds": 600,
+  "reportsDir": "reports",
+  "prGate": {
+    "requireVerification": true,
+    "requireReview": true
+  },
+  "checks": [
+    {
+      "name": "Unity EditMode テスト（コンパイル確認を含む）",
+      "command": ".\\.claude\\scripts\\checks\\unity-tests.ps1 -Platform EditMode",
+      "timeoutMinutes": 30
+    }
+  ],
+  "postEditChecks": []
+}
