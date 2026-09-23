@@ -184,7 +184,9 @@ public class FriendHamDialogueSystem : DialogueSystem
             //     }
             // ));
             
-            StartCoroutine(friendHamStatus.Speak(playerMessage, 
+            // コルーチンは FriendHamStatus 側で動かす（FriendHamStatus が無効になったときに一緒に止まり、
+            // OnDisable で送信待ちの状態を戻せるようにするため）
+            friendHamStatus.StartCoroutine(friendHamStatus.Speak(playerMessage,
                 res => {
                     // ストリーミング中の更新
                     chattingText.text = res;

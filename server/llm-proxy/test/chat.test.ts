@@ -140,10 +140,10 @@ describe('POST /chat（Claude に切り戻したとき）', () => {
   });
 
   it.each([
-    ['fetch が失敗する', async () => Promise.reject(new Error('network down'))],
-    ['200 で HTML が返る', async () => claudeResponse('<html>error</html>')],
-    ['200 で content が空', async () => claudeResponse({ content: [] })],
-  ])('%s場合は 502 upstream', async (_label, fetchImpl) => {
+    ['fetch が失敗した', async () => Promise.reject(new Error('network down'))],
+    ['200 で HTML が返った', async () => claudeResponse('<html>error</html>')],
+    ['200 で content が空だった', async () => claudeResponse({ content: [] })],
+  ])('%s ときは 502 upstream', async (_label, fetchImpl) => {
     const res = await call(claudeEnv(), '/chat', chatBody(), { fetch: fetchImpl as never });
     expect(res.status).toBe(502);
     expect(res.json).toEqual({ error: 'upstream' });

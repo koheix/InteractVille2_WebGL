@@ -60,6 +60,8 @@ function createProvider(env: Env, deps: Deps): Provider {
 }
 
 // 旧 API。公開中の古いビルドが送る Claude Messages API の本文を、そのまま Claude に中継する。
+// 古いビルドは Claude の形式で応答を読むので、失敗時も上流のステータスと本文をそのまま返す
+// （「上流の本文は返さない」という規約の例外。元の worker.js と同じ動きで、移行が済んだら削除する）。
 async function legacyPassthrough(request: Request, env: Env, deps: Deps, cors: CorsHeaders): Promise<Response> {
   const body = await readJsonBody(request);
   if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new ProxyError('bad_request');

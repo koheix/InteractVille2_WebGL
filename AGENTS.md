@@ -198,7 +198,9 @@ npx wrangler login     # 初回のみ。利用者に依頼する
 npm run dev            # http://localhost:8787 。Workers AI は実物を呼ぶ（無料枠を消費する）
 ```
 
-Unity からローカルのプロキシを使うときは、`LLMBridge.cs` の `PROXY_URL` を一時的に書き換える（コミットしない）。
+Unity エディタからローカルのプロキシを使うときは、環境変数 `IV2_LLM_PROXY_URL` を設定してから Unity を起動する
+（例: `$env:IV2_LLM_PROXY_URL = "http://localhost:8787"`）。エディタでだけ有効で、ビルドには影響しない。
+`LLMBridge.cs` の `PROXY_URL` は書き換えない。
 
 ## デプロイ
 

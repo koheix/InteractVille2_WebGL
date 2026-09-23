@@ -218,8 +218,9 @@ public class FriendHamStatus : MonoBehaviour
 
     void OnDisable()
     {
-        // 非アクティブ化で止まったコルーチンは後処理（CoroutineFlow.Guard の finally）が走らないので、ここで戻す。
-        // 戻さないと、再びアクティブになったときに以後の送信がすべて弾かれる。
+        // Speak のコルーチンはこのコンポーネント上で動く（FriendHamDialogueSystem が friendHamStatus.StartCoroutine で起動する）。
+        // 無効化で止まったコルーチンは後処理（CoroutineFlow.Guard の finally）が走らないので、ここで戻す。
+        // 戻さないと、再び有効になったときに以後の送信がすべて弾かれる。
         IsSpeaking = false;
 
         // 会話をしていれば会話履歴を更新する
