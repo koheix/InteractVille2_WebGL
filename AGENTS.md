@@ -233,7 +233,11 @@ Windows の Git Bash の `curl` は日本語の本文の文字コードが崩れ
 ローカルの作業コピーは `C:\Users\grape\IV2_WebGL_ver1_0_0`）
 
 1. **Unity エディタを閉じてもらう**（開いたままだと batchmode で起動できない。エディタを勝手に終了させない）
-2. `main` の最新からビルドする。出力先のフォルダ名が `Build/` のファイル名になるので、`IV2_WebGL_ver1_0_0` という名前のフォルダに出す。
+2. `main` の最新からビルドする。batchmode のビルドは作業ツリーをそのまま使うので、先に `git status` で未コミットの変更が無いことを確かめる。
+   ただし `Assets/TextMesh Pro/Resources/Fonts & Materials/NotoSansJP-Medium SDF.asset` は例外。
+   動的フォント（`m_AtlasPopulationMode: 1`）のアトラスがエディタの操作やビルドのたびに書き換わるが、`m_ClearDynamicDataOnBuild: 1` なので
+   ビルドには影響しない（コミットもしない。気になるなら `git restore` で戻す）。
+   出力先のフォルダ名が `Build/` のファイル名になるので、`IV2_WebGL_ver1_0_0` という名前のフォルダに出す。
    初回や Library の再構築時は 20 分以上かかるので、バックグラウンドで実行する
    ```powershell
    $env:IV2_WEBGL_OUT = "<一時フォルダ>\IV2_WebGL_ver1_0_0"
@@ -241,7 +245,8 @@ Windows の Git Bash の `curl` は日本語の本文の文字コードが崩れ
        -projectPath . -buildTarget WebGL -executeMethod WebGLBuilder.Build -logFile <ログのパス>
    ```
    終了コード 0 と、ログの `[WebGLBuilder] result=Succeeded` を確認する（スクリプトは `Assets/Editor/WebGLBuilder.cs`）
-3. 出力された `index.html` と `TemplateData/` を、公開中のものと比べる（`diff`）。
+3. 作業コピーで `git pull` して origin に合わせる（`git status` がきれいなこと）。
+   そのうえで、出力された `index.html` と `TemplateData/` を、公開中のものと比べる（`diff`）。
    公開中の `index.html` は手で直したことがある（全画面ボタンの処理など）。違いがあれば上書きせず、利用者に確認する。
    同じなら `Build/` の 4 ファイルだけを作業コピーに上書きする
 4. 作業コピーでコミットする（公開リポジトリは `main` に直接コミットする運用。メッセージにはビルド元のコミットを書く）
@@ -251,6 +256,9 @@ Windows の Git Bash の `curl` は日本語の本文の文字コードが崩れ
    利用者には Ctrl+Shift+R で再読み込みして動作を確かめてもらう
 
 API（`/chat`・`/score`）の形を変えたときは、ビルドを公開する前に LLM プロキシをデプロイする。
+
+この手順は Player Settings の WebGL の設定（Brotli 圧縮・Decompression Fallback・ファイル名にハッシュを付けない）を前提にしている。
+設定を変えると `Build/` のファイル名や拡張子が変わり、公開中の `index.html` と合わなくなるので、その場合は `index.html` ごと差し替える。
 
 ## レビューで特に見る点
 
