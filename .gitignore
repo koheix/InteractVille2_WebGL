@@ -73,3 +73,6 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 # *.asset
+
+# Claude Code ハーネスの検証記録・レポート（.claude/harness.json の reportsDir）
+/[Rr]eports/
