@@ -17,7 +17,6 @@ export interface Env {
   CLAUDE_MODEL?: string;
   CLAUDE_API_KEY?: string;
   ALLOWED_ORIGINS?: string;
-  LEGACY_CLAUDE_PASSTHROUGH?: string;
 }
 
 export type Role = 'user' | 'assistant';

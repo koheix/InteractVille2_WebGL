@@ -17,10 +17,9 @@ export function makeEnv(run: AiRun = async () => ({}), overrides: Partial<Omit<E
     CHAT_REASONING_EFFORT: 'low',
     CHAT_MAX_OUTPUT_TOKENS: '1024',
     SCORE_MODEL: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-    CLAUDE_MODEL: 'claude-sonnet-4-20250514',
+    CLAUDE_MODEL: 'claude-sonnet-5',
     CLAUDE_API_KEY: 'sk-test-key',
     ALLOWED_ORIGINS: ORIGIN,
-    LEGACY_CLAUDE_PASSTHROUGH: 'true',
     ...overrides,
   };
 }

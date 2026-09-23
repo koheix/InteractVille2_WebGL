@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import examples from '../contract/examples.json';
-import { call, chatBody, claudeResponse, makeEnv, ORIGIN, responsesOutput } from './helpers';
+import { call, chatBody, makeEnv, ORIGIN, responsesOutput } from './helpers';
 
 describe('CORS', () => {
   it('許可された Origin のプリフライトには、許可ヘッダと Vary: Origin を返す', async () => {
@@ -80,72 +80,39 @@ describe('ルーティング', () => {
   });
 });
 
-describe('旧 API（公開中の古いビルド用）', () => {
-  const legacyBody = { model: 'claude-sonnet-4-20250514', max_tokens: 1024, messages: [{ role: 'user', content: 'a' }], tools: [], stream: true };
+describe('削除した旧 API（Claude への素通し）', () => {
+  // 以前の古いビルドが送っていた Claude Messages API 形式の本文
+  const legacyBody = { model: 'claude-sonnet-5', max_tokens: 1024, messages: [{ role: 'user', content: 'a' }], stream: false };
 
-  it('有効なときは本文を stream=false にしてそのまま Claude に中継し、応答をそのまま返す', async () => {
-    const upstream = { id: 'msg_1', content: [{ type: 'text', text: 'やあ' }] };
-    const res = await call(makeEnv(), '/', legacyBody, { fetch: async () => claudeResponse(upstream, 200) });
-    expect(res.status).toBe(200);
-    expect(res.json).toEqual(upstream);
+  // 以前の設定値（LEGACY_CLAUDE_PASSTHROUGH: "true"）がダッシュボードなどに残っていても効かないことを確かめる
+  const envWithOldSetting = () => ({ ...makeEnv(async () => responsesOutput('ok')), LEGACY_CLAUDE_PASSTHROUGH: 'true' });
+
+  it.each([
+    ['ブラウザ（許可された Origin）', ORIGIN, ORIGIN],
+    ['curl など（Origin ヘッダなし）', null, null],
+  ])('POST / は %s からでも 404 で、Claude も Workers AI も呼ばない（Claude の API キーを使う中継を誰にも使わせない）', async (_label, origin, allowOrigin) => {
+    const env = envWithOldSetting();
+    const res = await call(env, '/', legacyBody, { origin, headers: { 'anthropic-version': '2023-06-01' } });
+    expect(res.status).toBe(404);
+    expect(res.json).toEqual({ error: 'not_found' });
+    expect(res.fetch).not.toHaveBeenCalled();
+    expect(env.AI.run).not.toHaveBeenCalled();
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(allowOrigin);
+  });
+
+  it('/ へのプリフライトも 404 で、許可メソッド・許可ヘッダを返さず、CORS の Allow-Origin だけ付ける', async () => {
+    const res = await call(envWithOldSetting(), '/', undefined, { method: 'OPTIONS' });
+    expect(res.status).toBe(404);
+    expect(res.json).toEqual({ error: 'not_found' });
+    expect(res.headers.get('Access-Control-Allow-Methods')).toBeNull();
+    expect(res.headers.get('Access-Control-Allow-Headers')).toBeNull();
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ORIGIN);
-    const [url, init] = res.fetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://api.anthropic.com/v1/messages');
-    expect(init.headers).toMatchObject({ 'x-api-key': 'sk-test-key' });
-    expect(JSON.parse(init.body as string)).toEqual({ ...legacyBody, stream: false });
   });
 
-  it('有効なときのプリフライトは anthropic-version ヘッダを許可する（古いビルドが付けて送るため）', async () => {
-    const res = await call(makeEnv(), '/', undefined, { method: 'OPTIONS' });
-    expect(res.status).toBe(204);
-    expect(res.headers.get('Access-Control-Allow-Headers')).toContain('anthropic-version');
-  });
-
-  it.each([
-    [429, '{"type":"error","error":{"type":"rate_limit_error"}}'],
-    [529, '{"type":"error","error":{"type":"overloaded_error"}}'],
-    [500, '{"type":"error"}'],
-  ])('上流が HTTP %i を返したら、そのステータスと本文をそのまま中継する（古いビルドは Claude の形式で読むため）', async (status, body) => {
-    const res = await call(makeEnv(), '/', legacyBody, { fetch: async () => claudeResponse(body, status) });
-    expect(res.status).toBe(status);
-    expect(res.text).toBe(body);
-  });
-
-  it('CLAUDE_API_KEY が無ければ Claude を呼ばずに 500 config（x-api-key: undefined を送らない）', async () => {
-    const res = await call(makeEnv(undefined, { CLAUDE_API_KEY: undefined }), '/', legacyBody);
-    expect(res.status).toBe(500);
-    expect(res.json).toEqual({ error: 'config' });
-    expect(res.fetch).not.toHaveBeenCalled();
-  });
-
-  it('Claude への接続に失敗したら 502 upstream（例外の文言は返さない）', async () => {
-    const res = await call(makeEnv(), '/', legacyBody, { fetch: async () => Promise.reject(new Error('dns failure sk-x')) });
-    expect(res.status).toBe(502);
-    expect(res.text).toBe('{"error":"upstream"}');
-  });
-
-  it.each([
-    ['配列', '[]'],
-    ['null', 'null'],
-    ['JSON でない', 'abc'],
-  ])('本文が%sなら 400 bad_request で、Claude を呼ばない', async (_label, raw) => {
-    const res = await call(makeEnv(), '/', raw);
-    expect(res.status).toBe(400);
-    expect(res.json).toEqual({ error: 'bad_request' });
-    expect(res.fetch).not.toHaveBeenCalled();
-  });
-
-  it('旧 API が無効なら、/chat のプリフライトは anthropic-version ヘッダを許可しない', async () => {
-    const res = await call(makeEnv(undefined, { LEGACY_CLAUDE_PASSTHROUGH: 'false' }), '/chat', undefined, { method: 'OPTIONS' });
+  it.each(['/chat', '/score'])('%s のプリフライトは Content-Type だけを許可する（以前の設定値が残っていても anthropic-version は許可しない）', async (path) => {
+    const res = await call(envWithOldSetting(), path, undefined, { method: 'OPTIONS' });
     expect(res.status).toBe(204);
     expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type');
-  });
-
-  it.each(['false', 'TRUE', '1', undefined])('LEGACY_CLAUDE_PASSTHROUGH=%j なら 404 で、Claude を呼ばず、CORS ヘッダは付ける', async (value) => {
-    const res = await call(makeEnv(undefined, { LEGACY_CLAUDE_PASSTHROUGH: value }), '/', legacyBody);
-    expect(res.status).toBe(404);
-    expect(res.fetch).not.toHaveBeenCalled();
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ORIGIN);
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isLegacyEnabled, readAllowedOrigins, readConfig } from '../src/config';
+import { readAllowedOrigins, readConfig } from '../src/config';
 import { ProxyError } from '../src/types';
 import { makeEnv } from './helpers';
 
@@ -68,15 +68,5 @@ describe('設定の読み込み', () => {
       'https://a.example',
       'https://b.example',
     ]);
-  });
-
-  it.each([
-    ['true', true],
-    ['TRUE', false],
-    ['1', false],
-    ['false', false],
-    [undefined, false],
-  ])('旧 API は LEGACY_CLAUDE_PASSTHROUGH が "true" と完全一致のときだけ有効（%j → %s）', (value, expected) => {
-    expect(isLegacyEnabled(makeEnv(undefined, { LEGACY_CLAUDE_PASSTHROUGH: value }))).toBe(expected);
   });
 });

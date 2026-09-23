@@ -55,8 +55,3 @@ export function readAllowedOrigins(env: Env): string[] {
     .map((origin) => origin.trim())
     .filter((origin) => origin !== '');
 }
-
-// 旧 API は "true" と完全一致のときだけ有効。
-export function isLegacyEnabled(env: Env): boolean {
-  return env.LEGACY_CLAUDE_PASSTHROUGH === 'true';
-}
