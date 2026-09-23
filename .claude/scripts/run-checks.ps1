@@ -275,7 +275,10 @@ function New-TestSpec {
                 $number += 1
                 $caseName = Format-Cell ([string](Get-Prop $case 'name' ''))
                 $description = Format-Cell ([string](Get-Prop $case 'description' ''))
-                $title = if ($description) { "$description<br>``$caseName``" } else { "``$caseName``（説明なし）" }
+                # vitest などテスト名そのものが説明になっている場合は、同じ文を二重に出さない。
+                $title = if (-not $description) { "``$caseName``（説明なし）" }
+                elseif ($description -eq $caseName) { $description }
+                else { "$description<br>``$caseName``" }
 
                 $notes = @()
                 $message = [string](Get-Prop $case 'message' '')

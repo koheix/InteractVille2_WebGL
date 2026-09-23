@@ -1,267 +1,121 @@
 using System;
 using System.Collections;
-using System.Text;
-using UnityEngine;
-using UnityEngine.Networking;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using InteractVille2.LLM;
+using UnityEngine;
+using UnityEngine.Networking;
 
+/// <summary>
+/// LLM プロキシ（server/llm-proxy、Cloudflare Workers）との通信。
+///
+/// プロキシが Workers AI / Claude のどちらを使うかは Worker 側の設定で決まるので、
+/// ここではプロバイダを意識しない。リクエストの組み立てと応答の解釈は Core の LlmApi が行う。
+/// どの呼び出しも、成功・失敗・タイムアウトのいずれでも onComplete をちょうど 1 回呼ぶ。
+/// </summary>
 public class LLMBridge : MonoBehaviour
 {
-    // フロントでAPIキーを載せないようにプロキシサーバを利用
-    // private const string CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
-    private const string CLAUDE_API_URL = "https://llm-proxy.grapeoxygen.workers.dev";
-    private const string CLAUDE_VERSION = "2023-06-01";
+    // API キーはプロキシ側にあり、クライアントは URL だけを知る。
+    private const string PROXY_URL = "https://llm-proxy.grapeoxygen.workers.dev";
 
-    // Structured Output用のクラス
-    [Serializable]
-    public class ClaudeTool
+    // エディタでだけ、環境変数でプロキシの URL を差し替えられる（ローカルの wrangler dev で失敗経路を確かめるため）。
+    // 例: $env:IV2_LLM_PROXY_URL = "http://localhost:8787" を設定してから Unity を起動する。ビルドには影響しない。
+    private const string PROXY_URL_ENV = "IV2_LLM_PROXY_URL";
+
+    private static string ProxyUrl
     {
-        public string name;
-        public string description;
-        public ToolInputSchema input_schema;
-    }
-
-    [Serializable]
-    public class ToolInputSchema
-    {
-        public string type = "object";
-        public ToolProperties properties;
-        public string[] required;
-    }
-
-    [Serializable]
-    public class ToolProperties
-    {
-        public ToolProperty result;
-    }
-
-    [Serializable]
-    public class ToolProperty
-    {
-        public string type;
-        public string description;
-    }
-
-    // レスポンスのJSONデータ構造
-    [System.Serializable]
-    private class ClaudeRequest
-    {
-        public string model = "claude-sonnet-4-20250514";
-        public int max_tokens = 1024;
-        // ロールを演じさせるためのシステムメッセージ
-        public string system = null;
-        public Message[] messages;
-        public bool stream = false; // ストリーミングオプション
-        public ClaudeTool[] tools = null;
-    }
-
-    [System.Serializable]
-    private class ClaudeResponse
-    {
-        public string id;
-        public string type;
-        public string role;
-        public Content[] content;
-        public string model;
-        public string stop_reason;
-    }
-
-    [System.Serializable]
-    private class Content
-    {
-        public string type;
-        public string text;
-        public string id;
-        public string name;
-        public ToolInput input;
-    }
-
-    [Serializable]
-    public class ToolInput
-    {
-        public int result;
-    }
-
-    /// <summary>
-    /// Claude APIからレスポンスを取得する
-    /// </summary>
-    /// <param name="message">送信するメッセージ</param>
-    /// <param name="APIKey">Claude APIキー</param>
-    /// <returns>Claude APIからのレスポンステキスト</returns>
-    // ストリーミング対応版
-    // public IEnumerator GetLLMResponse(string systemMessage, Message[] messages, System.Action<string> onPartialResponse = null, bool stream = true)
-    // {
-    //     ClaudeRequest requestData = new ClaudeRequest
-    //     {
-    //         system = systemMessage,
-    //         messages = messages,  // 履歴全体を送信
-    //         stream = true
-    //     };
-
-
-    //     string jsonData = JsonUtility.ToJson(requestData);
-    //     byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
-    //     // リクエストボディの表示（デバッグ用）
-    //     Debug.Log($"Request Body: {jsonData}");
-
-    //     using (UnityWebRequest request = new UnityWebRequest(CLAUDE_API_URL, "POST"))
-    //     {
-    //         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-    //         request.downloadHandler = new StreamingDownloadHandler(onPartialResponse);
-
-    //         request.SetRequestHeader("Content-Type", "application/json");
-    //         // プロキシサーバに載せてもらうため不要
-    //         // request.SetRequestHeader("x-api-key", PlayerPrefs.GetString("APIKey"));
-    //         request.SetRequestHeader("anthropic-version", CLAUDE_VERSION);
-
-    //         yield return request.SendWebRequest();
-
-    //         if (request.result != UnityWebRequest.Result.Success)
-    //         {
-    //             Debug.LogError($"Claude API Error: {request.error}");
-    //             yield return $"Error: {request.error}";
-    //             yield break;
-    //         }
-
-    //         yield return ((StreamingDownloadHandler)request.downloadHandler).GetFullText();
-    //     }
-    // }
-
-    // プロキシでストリーミングがうまくいかないので疑似ストリーミング
-    public IEnumerator GetLLMResponse(
-        string systemMessage,
-        Message[] messages,
-        System.Action<string> onPartialResponse = null
-    )
-    {
-        ClaudeRequest requestData = new ClaudeRequest
+        get
         {
-            system = systemMessage,
-            messages = messages,
-            stream = false   
-        };
+#if UNITY_EDITOR
+            string overridden = Environment.GetEnvironmentVariable(PROXY_URL_ENV);
+            if (!string.IsNullOrWhiteSpace(overridden)) return overridden.TrimEnd('/');
+#endif
+            return PROXY_URL;
+        }
+    }
 
-        string jsonData = JsonUtility.ToJson(requestData);
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonData);
+    // 応答が返らないとコルーチンが永久に待ち、タイトルへ戻る処理も終わらなくなるので必ず区切る。
+    public const int ChatTimeoutSeconds = 60;
+    public const int ScoreTimeoutSeconds = 30;
 
-        using (UnityWebRequest request = new UnityWebRequest(CLAUDE_API_URL, "POST"))
+    // 疑似ストリーミングの 1 文字あたりの表示間隔（秒）
+    private const float StreamingInterval = 0.03f;
+
+    /// <summary>会話・要約・気分を生成する（POST /chat）。</summary>
+    public IEnumerator Chat(string systemMessage, IReadOnlyList<Message> messages, Action<LlmResult> onComplete)
+    {
+        string json;
+        try
         {
-            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            json = LlmApi.BuildChatRequestJson(systemMessage, ConversationRules.TrimForRequest(messages));
+        }
+        catch (ArgumentException e)
+        {
+            Debug.LogError($"[LLM] 会話リクエストを組み立てられませんでした: {e.Message}");
+            onComplete?.Invoke(LlmResult.Fail(LlmErrorKind.BadRequest));
+            yield break;
+        }
+        yield return Post(LlmApi.ChatPath, json, ChatTimeoutSeconds, LlmApi.ParseChatResponse, onComplete);
+    }
+
+    /// <summary>0〜100 のスコア（親密度・感情価・覚醒度）を求める（POST /score）。</summary>
+    public IEnumerator Score(string prompt, Action<LlmResult> onComplete)
+    {
+        string json;
+        try
+        {
+            json = LlmApi.BuildScoreRequestJson(prompt);
+        }
+        catch (ArgumentException e)
+        {
+            Debug.LogError($"[LLM] スコアのリクエストを組み立てられませんでした: {e.Message}");
+            onComplete?.Invoke(LlmResult.Fail(LlmErrorKind.BadRequest));
+            yield break;
+        }
+        yield return Post(LlmApi.ScorePath, json, ScoreTimeoutSeconds, LlmApi.ParseScoreResponse, onComplete);
+    }
+
+    /// <summary>文章を 1 文字（書記素）ずつ伸ばして表示する（プロキシはストリーミングしないので疑似的に行う）。</summary>
+    public IEnumerator PseudoStreaming(string text, Action<string> onPartialResponse)
+    {
+        foreach (string prefix in ConversationRules.StreamingPrefixes(text))
+        {
+            onPartialResponse?.Invoke(prefix);
+            yield return new WaitForSeconds(StreamingInterval);
+        }
+    }
+
+    private IEnumerator Post(string path, string json, int timeoutSeconds, Func<long, string, bool, LlmResult> parse, Action<LlmResult> onComplete)
+    {
+        using (UnityWebRequest request = new UnityWebRequest(ProxyUrl + path, "POST"))
+        {
+            request.uploadHandler = new UploadHandlerRaw(LlmApi.ToRequestBytes(json));
             request.downloadHandler = new DownloadHandlerBuffer();
-
             request.SetRequestHeader("Content-Type", "application/json");
-            request.SetRequestHeader("anthropic-version", CLAUDE_VERSION);
+            request.timeout = timeoutSeconds;
 
             yield return request.SendWebRequest();
 
-            if (request.result != UnityWebRequest.Result.Success)
+            // 接続失敗・タイムアウトは ConnectionError。4xx/5xx は ProtocolError で、本文にエラー種別が入っている。
+            bool networkError = request.result == UnityWebRequest.Result.ConnectionError;
+            LlmResult result;
+            try
             {
-                Debug.LogError($"Claude API Error: {request.error}");
-                yield break;
+                result = parse(request.responseCode, request.downloadHandler?.text, networkError);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[LLM] {path} の応答を解釈できませんでした: {e.Message}");
+                result = LlmResult.Fail(LlmErrorKind.Upstream);
             }
 
-            string responseText = request.downloadHandler.text;
-
-            // Claudeの通常レスポンスをパース
-            ClaudeResponse response =
-                JsonUtility.FromJson<ClaudeResponse>(responseText);
-
-            string fullText = response.content[0].text;
-
-            // 疑似ストリーミング
-            yield return StartCoroutine(
-                PseudoStreaming(fullText, onPartialResponse)
-            );
-        }
-    }
-
-    private IEnumerator PseudoStreaming(
-        string text,
-        System.Action<string> onPartialResponse,
-        float interval = 0.03f   // 表示速度（好みで調整）
-    )
-    {
-        StringBuilder buffer = new StringBuilder();
-
-        foreach (char c in text)
-        {
-            buffer.Append(c);
-            onPartialResponse?.Invoke(buffer.ToString());
-            yield return new WaitForSeconds(interval);
-        }
-    }
-
-
-
-    // カスタムDownloadHandler
-    public class StreamingDownloadHandler : DownloadHandlerScript
-    {
-        private System.Action<string> onPartialResponse;
-        private string fullText = "";
-
-        public StreamingDownloadHandler(System.Action<string> callback) : base()
-        {
-            onPartialResponse = callback;
-        }
-
-        protected override bool ReceiveData(byte[] data, int dataLength)
-        {
-            if (data == null || dataLength == 0) return false;
-
-            string chunk = Encoding.UTF8.GetString(data, 0, dataLength);
-
-            // Server-Sent Events (SSE)形式をパース
-            string[] lines = chunk.Split('\n');
-            foreach (string line in lines)
+            if (!result.IsSuccess)
             {
-                if (line.StartsWith("data: "))
-                {
-                    string jsonData = line.Substring(6);
-                    if (jsonData == "[DONE]") continue;
-
-                    try
-                    {
-                        // Claude streaming responseのパース
-                        var streamEvent = JsonUtility.FromJson<ClaudeStreamEvent>(jsonData);
-
-                        if (streamEvent.type == "content_block_delta" &&
-                            streamEvent.delta != null &&
-                            !string.IsNullOrEmpty(streamEvent.delta.text))
-                        {
-                            fullText += streamEvent.delta.text;
-                            onPartialResponse?.Invoke(fullText);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogWarning($"Parse error: {e.Message}");
-                    }
-                }
+                Debug.LogWarning($"[LLM] {path} が失敗しました: {result.Error}（HTTP {request.responseCode}, {request.error}）");
             }
-
-            return true;
+            onComplete?.Invoke(result);
         }
-
-        public string GetFullText()
-        {
-            return fullText;
-        }
-    }
-
-    // Streaming用のデータクラス
-    [System.Serializable]
-    public class ClaudeStreamEvent
-    {
-        public string type;
-        public StreamDelta delta;
-    }
-
-    [System.Serializable]
-    public class StreamDelta
-    {
-        public string type;
-        public string text;
     }
 
     // メッセージ履歴を管理するクラス
@@ -270,9 +124,12 @@ public class LLMBridge : MonoBehaviour
     {
         public List<Message> messages = new List<Message>();
 
-        public void AddUserMessage(string content)
+        /// <summary>ユーザーの発言を追加する。失敗時に取り除けるよう、追加したメッセージを返す。</summary>
+        public Message AddUserMessage(string content)
         {
-            messages.Add(new Message { role = "user", content = content });
+            var message = new Message { role = "user", content = content };
+            messages.Add(message);
+            return message;
         }
 
         public void AddAssistantMessage(string content)
@@ -285,10 +142,10 @@ public class LLMBridge : MonoBehaviour
         {
             if (count <= 0)
                 return new Message[0];
-            
+
             if (count >= messages.Count)
                 return messages.ToArray();
-            
+
             return messages.Skip(messages.Count - count).ToArray();
         }
 
@@ -297,117 +154,7 @@ public class LLMBridge : MonoBehaviour
             messages.Clear();
         }
 
-        public string MessagesToString()
-        {
-            if (messages.Count == 0) return string.Empty;
-            return string.Join("\n", messages.Take(messages.Count - 1).Select(m => $"{m.role}: {m.content}"));
-        }
-    }
-
-    // Structured Outputを使ったLLM応答を取得するmethod
-    // とりあえず数値を返すものに対応
-    public IEnumerator GetLLMStructuredOutputResponse(string resultType, string name, string description, string question, Action<float> onComplete, Action<string> onError)
-    {
-        // ツールの定義
-        ClaudeTool[] tools = new ClaudeTool[]
-        {
-            new ClaudeTool
-            {
-                // name = "return_calculation",
-                // description = "Returns the result of a calculation",
-                name = name,
-                description = description,
-                input_schema = new ToolInputSchema
-                {
-                    type = "object",
-                    properties = new ToolProperties
-                    {
-                        result = new ToolProperty
-                        {
-                            type = resultType,
-                            description = "The " + resultType + " result"
-                        }
-                    },
-                    required = new string[] { "result" }
-                }
-            }
-        };
-
-        // リクエストの作成
-        ClaudeRequest request = new ClaudeRequest
-        {
-            model = "claude-sonnet-4-20250514",
-            max_tokens = 1024,
-            messages = new Message[]
-            {
-                new Message
-                {
-                    role = "user",
-                    // content = question + " Use the return_calculation tool to return the result."
-                    content = question
-                }
-            },
-            tools = tools
-        };
-
-        string jsonRequest = JsonUtility.ToJson(request);
-        // リクエストボディの表示（デバッグ用）
-        Debug.Log($"Request Body(Structured output): {jsonRequest}");
-
-        // UnityWebRequestの作成
-        UnityWebRequest webRequest = new UnityWebRequest(CLAUDE_API_URL, "POST");
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonRequest);
-        webRequest.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        webRequest.downloadHandler = new DownloadHandlerBuffer();
-
-        // ヘッダーの設定
-        webRequest.SetRequestHeader("Content-Type", "application/json");
-        // プロキシサーバに載せてもらうため不要
-        // webRequest.SetRequestHeader("x-api-key", PlayerPrefs.GetString("APIKey"));
-        webRequest.SetRequestHeader("anthropic-version", CLAUDE_VERSION);
-
-        // リクエスト送信
-        yield return webRequest.SendWebRequest();
-
-        if (webRequest.result == UnityWebRequest.Result.Success)
-        {
-            string responseText = webRequest.downloadHandler.text;
-            ClaudeResponse response = JsonUtility.FromJson<ClaudeResponse>(responseText);
-
-            // ツール使用のブロックを探す
-            bool found = false;
-            foreach (var block in response.content)
-            {
-                if (block.type == "tool_use" && block.name == "return_calculation")
-                {
-                    Debug.Log($"Structured Output Result: {block.input.result}");
-                    int result = block.input.result;
-                    onComplete?.Invoke(result);
-                    found = true;
-                    break;
-                }
-                else if (block.type == "tool_use" && block.name == "return_mood")
-                {
-                    Debug.Log($"Structured Output Result: {block.input.result}");
-                    string result = block.input.result.ToString();
-                    onComplete?.Invoke(float.Parse(result));
-                    found = true;
-                    break;
-                }
-            }
-
-            if (!found)
-            {
-                onError?.Invoke("Tool use not found in response");
-            }
-        }
-        else
-        {
-            string errorMessage = $"Error: {webRequest.error}\nResponse: {webRequest.downloadHandler.text}";
-            Debug.LogError(errorMessage);
-            onError?.Invoke(errorMessage);
-        }
-
-        webRequest.Dispose();
+        // プロンプト用の会話ログは ConversationRules.FormatForPrompt で作る。以前の MessagesToString は
+        // 「最後の 1 件は要約の指示」という前提で末尾を落としていたため、要約の前に呼ぶと本物の発言が消えていた。
     }
 }

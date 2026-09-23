@@ -1,0 +1,34 @@
+{
+  // ともハムの会話用 LLM プロキシ。公開 URL: https://llm-proxy.grapeoxygen.workers.dev
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "llm-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "observability": { "enabled": true },
+
+  // Workers AI。API キーは不要（アカウントのバインディングで呼ぶ）。
+  // Workers AI にはローカルの模擬環境が無いので、wrangler dev でも実物を呼ぶ（無料枠を消費する）。
+  "ai": { "binding": "AI", "remote": true },
+
+  "vars": {
+    // workers-ai（既定）か claude。claude に切り替えるだけで以前の Claude API に戻せる。
+    "LLM_PROVIDER": "workers-ai",
+
+    // Workers AI のモデル。会話・要約・気分は CHAT_MODEL、親密度などのスコアは SCORE_MODEL（JSON Mode 対応が必要）。
+    "CHAT_MODEL": "@cf/openai/gpt-oss-120b",
+    "CHAT_REASONING_EFFORT": "low",
+    // 推論トークンもここに含まれるので、小さくしすぎると本文が空になる。
+    "CHAT_MAX_OUTPUT_TOKENS": "1024",
+    "SCORE_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+
+    // Claude に切り戻したときのモデル。API キーは secret の CLAUDE_API_KEY（wrangler secret put CLAUDE_API_KEY）。
+    "CLAUDE_MODEL": "claude-sonnet-4-20250514",
+
+    // ブラウザからの呼び出しを許す Origin（カンマ区切り）。Origin ヘッダの無い呼び出し（Unity エディタなど）は通す。
+    "ALLOWED_ORIGINS": "https://koheix.github.io",
+
+    // 公開中の古い WebGL ビルドが使う旧 API（POST / で Claude の Messages API へそのまま中継）。
+    // 新しいビルドを公開したら "false" にし、その後コードごと削除する。
+    "LEGACY_CLAUDE_PASSTHROUGH": "true"
+  }
+}

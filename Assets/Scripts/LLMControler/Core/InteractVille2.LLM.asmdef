@@ -1,0 +1,14 @@
+{
+    "name": "InteractVille2.LLM",
+    "rootNamespace": "InteractVille2.LLM",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

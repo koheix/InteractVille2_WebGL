@@ -13,6 +13,7 @@ using TMPro;
 using UnityEngine.UI;
 using System.Text.RegularExpressions;
 using System.Linq;
+using InteractVille2.LLM;
 
 
 public class FriendHamStatus : MonoBehaviour
@@ -78,6 +79,19 @@ public class FriendHamStatus : MonoBehaviour
     public List<long> speakHistoryLong;
 
     private bool canSpeak = false;
+    // checkSpeak でサーバー時刻を確かめられなかった（PlayFab の失敗・タイムアウト）なら true
+    private bool speakCheckFailed = false;
+    // checkSpeak が今回の会話として記録した時刻。LLM が失敗したら、この記録だけを取り消して回数を返す。
+    private DateTime lastSpeakTime;
+
+    // 会話回数の判定に使うサーバー時刻の取得を待つ上限（秒）
+    private const float ServerTimeTimeoutSeconds = 15f;
+
+    // ともハムが返事を考えている間は true（通信中に次の発言を受け付けない）
+    public bool IsSpeaking { get; private set; }
+
+    // 記憶の要約を頼むために会話履歴へ追加した指示。会話ログを保存するときにこれだけを取り除く。
+    private Message summaryInstruction;
 
     // memory(ともハムの記憶を保存するための文字列リスト)
     // ゲームが終了するときに保存する(SaveDaoを使う)
@@ -85,6 +99,8 @@ public class FriendHamStatus : MonoBehaviour
     // memory = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamMemory);
     public List<string> memory;
     private const int MaxMemorySize = 20; // 最大メモリ数
+    // スコアのプロンプトに埋め込む会話ログの上限。前後の説明文の分を空けて、プロキシの上限（30,000 文字）に収める。
+    private const int ConversationPromptBudget = LlmLimits.PromptMaxChars - 2000;
     private LLMBridge.ConversationHistory conversationHistory = new LLMBridge.ConversationHistory();
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -202,15 +218,21 @@ public class FriendHamStatus : MonoBehaviour
 
     void OnDisable()
     {
+        // Speak のコルーチンはこのコンポーネント上で動く（FriendHamDialogueSystem が friendHamStatus.StartCoroutine で起動する）。
+        // 無効化で止まったコルーチンは後処理（CoroutineFlow.Guard の finally）が走らないので、ここで戻す。
+        // 戻さないと、再び有効になったときに以後の送信がすべて弾かれる。
+        IsSpeaking = false;
+
         // 会話をしていれば会話履歴を更新する
         if (conversationHistory.messages.Count > 1){
             // 会話履歴を保存しておく
             Debug.Log("FriendHamStatus: 会話履歴の保存");
             List<Message> conversationLog = new List<Message>();
             conversationLog = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.conversationHistory);
-            // if (conversationHistory.messages.Count > 1)
-            // {
-            conversationHistory.messages.RemoveAt(conversationHistory.messages.Count - 1);
+            // 要約の指示は会話ではないので保存しない。以前は「最後の 1 件」を消していたが、
+            // 要約をしなかった場合に本物の発言を消してしまうので、指示そのものを取り除く。
+            ConversationRules.RemoveExact(conversationHistory.messages, summaryInstruction);
+            summaryInstruction = null;
             conversationLog.AddRange(conversationHistory.messages);
             // }
             SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.conversationHistory = conversationLog);
@@ -314,6 +336,20 @@ public class FriendHamStatus : MonoBehaviour
 
     public IEnumerator Speak(string message, System.Action<string> onUpdate, System.Action<string> onComplete = null)
     {
+        if (IsSpeaking)
+        {
+            // 通信中の二重送信は受け付けない（呼び出し側でも止めているが念のため）
+            yield break;
+        }
+        IsSpeaking = true;
+        // 途中で例外が起きても IsSpeaking を戻す（戻さないと以後の送信がすべて弾かれ、会話 UI が固まる）。
+        // Unity に入れ子のコルーチンを渡すと、その中の例外は外側の finally を通らない。CoroutineFlow.Guard は
+        // 入れ子も自分で進めるので、SpeakCore の中では StartCoroutine を使わず、入れ子は yield return で渡す。
+        yield return CoroutineFlow.Guard(SpeakCore(message, onUpdate, onComplete), () => IsSpeaking = false);
+    }
+
+    private IEnumerator SpeakCore(string message, System.Action<string> onUpdate, System.Action<string> onComplete)
+    {
         string finalResponse = "";
         // ともハムと喋れるかを判定(1時間にMAX_SPEAKS_PER_HOUR回しか発話できない)
         yield return checkSpeak();
@@ -322,29 +358,31 @@ public class FriendHamStatus : MonoBehaviour
         UpdateRemainingTurnsUI();
 
         // 会話時間リスト保存
-        speakHistoryLong.Clear();
-        foreach (var dt in speakHistory)
-        {
-            speakHistoryLong.Add(dt.ToBinary());
-        }
-        SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistoryLong = speakHistoryLong);
+        SaveSpeakHistory();
         // 話せないならbreakする
         if (!canSpeak)
         {
             Debug.Log("yield break");
-            finalResponse = "ぼくとは1時間に"+ MAX_SPEAKS_PER_HOUR + "回しか話せないみたい...!";
+            // 時刻を確かめられなかったときは、上限に達したのとは別の理由を伝える
+            finalResponse = speakCheckFailed
+                ? "いまちょっと時計が読めないみたい…少し待ってから、もう一度話しかけてね！"
+                : "ぼくとは1時間に"+ MAX_SPEAKS_PER_HOUR + "回しか話せないみたい...!";
             onUpdate?.Invoke(finalResponse);
             onComplete?.Invoke(finalResponse);
             yield break;
         }
-        Debug.Log("[Friend Ham]Sending request to Claude API...");
-        
-
-        // ユーザーメッセージを履歴に追加
-        conversationHistory.AddUserMessage(message);
+        DateTime speakTime = lastSpeakTime;
+        Debug.Log("[Friend Ham]LLM プロキシに会話をリクエストします...");
 
 
-        IEnumerator responseCoroutine = llmBridge.GetLLMResponse(
+        // ユーザーメッセージを履歴に追加（失敗したらこのメッセージだけを取り除く）
+        Message userMessage = conversationHistory.AddUserMessage(message);
+
+        // アクティビティの記録が無いセーブデータでも落ちないようにする
+        List<string> activityMemory = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamActivityMemory) ?? new List<string>();
+
+        LlmResult result = null;
+        IEnumerator responseCoroutine = llmBridge.Chat(
             "あなたは親しみやすい友達のハムスターです。\n" +
             "ただし、メッセージは1から3文程度の短い文章で答えてください。\n" +
             "また、メッセージのみで、描写は含めないでください。\n" + 
@@ -357,30 +395,47 @@ public class FriendHamStatus : MonoBehaviour
             "前回の会話後のCloseness: " + Closeness.ToString() + "\n" +
             "以下はあなたのアクティビティ（家具を配置したことやプレイヤーにプレゼントされたものと時間）です。" +
             // string.Join("\n", SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamActivityMemory)) + // 最新の3つ程度に制限する
-            string.Join("\n", SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamActivityMemory).TakeLast(3).ToList()) +
+            string.Join("\n", activityMemory.TakeLast(3).ToList()) +
             "これらの情報を元に、以下のユーザーメッセージに返答してください。",  // システムメッセージ
-            conversationHistory.ToArray(),  // 履歴全体を送信
-            (partialText) =>
-            {
-                finalResponse = partialText;
-                onUpdate?.Invoke(partialText);
-            }
+            conversationHistory.messages,  // 履歴全体を送信（上限を超える分は古いものから LLMBridge が切り詰める）
+            r => result = r
         );
 
-        yield return StartCoroutine(responseCoroutine);
+        yield return responseCoroutine;
 
-        // アシスタントの返答を履歴に追加
-        conversationHistory.AddAssistantMessage(finalResponse);
+        // 成功なら返事を履歴に追加する。失敗なら今回の発言を履歴から取り除いて会話回数を返し、
+        // エラーの文言を表示する（文言は履歴に入れない）。規則は Core の ChatTurnRules にある。
+        ChatTurnOutcome outcome = ChatTurnRules.CompleteTurn(conversationHistory.messages, userMessage, speakHistory, speakTime, result);
+        finalResponse = outcome.DisplayText;
+        if (outcome.Refunded)
+        {
+            SaveSpeakHistory();
+            UpdateRemainingTurnsUI();
+        }
 
-        // // メモリにも保存
-        // memory.Add($"User: {message}");
-        // memory.Add($"Assistant: {finalResponse}");
+        if (outcome.Succeeded)
+        {
+            yield return llmBridge.PseudoStreaming(outcome.DisplayText, partialText => onUpdate?.Invoke(partialText));
+        }
+        else
+        {
+            onUpdate?.Invoke(outcome.DisplayText);
+        }
+
         DebugPrintConversation();
 
-        // // 会話残り回数を反映する
-        // UpdateRemainingTurnsUI();
-
         onComplete?.Invoke(finalResponse);
+    }
+
+    // 会話した時刻の記録を保存する
+    private void SaveSpeakHistory()
+    {
+        speakHistoryLong.Clear();
+        foreach (var dt in speakHistory)
+        {
+            speakHistoryLong.Add(dt.ToBinary());
+        }
+        SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistoryLong = speakHistoryLong);
     }
 
     // 会話履歴をクリア
@@ -403,7 +458,8 @@ public class FriendHamStatus : MonoBehaviour
     {
 
         // 発話時間のリストを取得
-        speakHistoryLong = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistoryLong);
+        // 記録の無い古いセーブデータでも落ちないようにする
+        speakHistoryLong = SaveDao.LoadData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistoryLong) ?? new List<long>();
         speakHistory.Clear();
         foreach (var tick in speakHistoryLong)
         {
@@ -412,11 +468,16 @@ public class FriendHamStatus : MonoBehaviour
         if(speakHistory == null) speakHistory = new List<DateTime>();
 
         canSpeak = false;
+        speakCheckFailed = false;
         bool isWaiting = true;
+        // 時刻の取得が返ってこないと会話がずっと始まらないので、一定時間で諦めて「話せない」扱いにする。
+        // 諦めた後に届いた応答は無視する（記録だけが増えて会話回数が減るのを防ぐ）。
+        bool abandoned = false;
 
         TimeUtil.GetSafeDateTime(
             serverTime =>
             {
+                if (abandoned) return;
                 // 現在時刻を取得
                 DateTime now = serverTime;
                 Debug.Log(serverTime);
@@ -431,6 +492,7 @@ public class FriendHamStatus : MonoBehaviour
                 {
                     // 今回の会話の時間を追加
                     speakHistory.Add(now);
+                    lastSpeakTime = now;
                     canSpeak = true;
                     Debug.Log("話せる");
                 }
@@ -443,14 +505,25 @@ public class FriendHamStatus : MonoBehaviour
             },
             error =>
             {
+                if (abandoned) return;
                 Debug.LogError("playfab error:" + error.GenerateErrorReport());
                 canSpeak = false;
+                speakCheckFailed = true;
                 isWaiting = false;
             }
         );
 
+        float deadline = Time.realtimeSinceStartup + ServerTimeTimeoutSeconds;
         while (isWaiting)
         {
+            if (Time.realtimeSinceStartup > deadline)
+            {
+                Debug.LogError("サーバー時刻の取得がタイムアウトしました。");
+                abandoned = true;
+                canSpeak = false;
+                speakCheckFailed = true;
+                break;
+            }
             yield return null;
         }
     }
@@ -510,22 +583,20 @@ public class FriendHamStatus : MonoBehaviour
         }
         // ---------------友ハムの親密度を更新して保存する
         Debug.Log("[Friend Ham]Closenessステータスを更新中...");
-        // ClosenessをLLMに計算させる
+        // ClosenessをLLMに計算させる（失敗したら会話前の値のまま）
+        LlmResult closenessResult = null;
         yield return StartCoroutine(
-        llmBridge.GetLLMStructuredOutputResponse(
-            resultType: "number",
-            name: "return_calculation",
-            description: "Returns the result of a calculation",
+        llmBridge.Score(
             "以下の会話データから、ハムスターの親密度(Closeness)を算出してください。(0~100の範囲で数値を返してください）\n" +
             "最後に会話をしてから時間が経過していたら、経過している時間が長いほど親密度を下げてください。" +
             "会話データ:" +
-            conversationHistory.MessagesToString() +
-            "\n最後に会話をした時間:" + ExtractDateTime(memory) + 
+            ConversationRules.FormatForPrompt(conversationHistory.messages, summaryInstruction, ConversationPromptBudget) +
+            "\n最後に会話をした時間:" + ExtractDateTime(memory) +
             "\n現在の時間:" + TimeUtil.GetCurrentTimeString() +
             "\n会話前のCloseness:" + Closeness.ToString(),
-            onComplete: result => Closeness = Mathf.Clamp((int)result, 0, 100),
-            onError: error => Debug.LogError(error)
+            r => closenessResult = r
         ));
+        Closeness = StatusRules.ApplyScore(Closeness, closenessResult);
         //
         Debug.Log("以下の情報をもとにClosenessを計算しました: " +
             "\n最後に会話をした時間:" + ExtractDateTime(memory) + 
@@ -540,36 +611,26 @@ public class FriendHamStatus : MonoBehaviour
         // ---------------LLMに履歴を渡してメモリを生成する
         Debug.Log("[Friend Ham]メモリを生成中...");
 
-        string finalResponse = "";
-        
-        // 要約支持を履歴に追加
+        // 要約支持を履歴に追加（会話ログを保存するときに、この指示だけを取り除く）
         string message = "これまでの会話履歴から、あなたとの重要な思い出や情報を3つ程度要約してメモリとして保存してください。" +
                          "それぞれは短い文章で表現してください。" +
                          "また、箇条書き形式で、その内容だけを出力してください。";
-        conversationHistory.AddUserMessage(message);
+        summaryInstruction = conversationHistory.AddUserMessage(message);
 
-        IEnumerator responseCoroutine = llmBridge.GetLLMResponse(
+        LlmResult summaryResult = null;
+        IEnumerator responseCoroutine = llmBridge.Chat(
             "最近の会話履歴から重要な情報を整理し、要約してください。",  // システムメッセージ
-            conversationHistory.ToArray(),  // 履歴全体を送信
-            (partialText) =>
-            {
-                finalResponse = partialText;
-            }
-            // stream: false  // ストリーミングは不要
+            conversationHistory.messages,  // 履歴全体を送信
+            r => summaryResult = r
         );
-        // StartCoroutine(responseCoroutine);
         yield return StartCoroutine(responseCoroutine);
-        Debug.Log($"[Friend Ham]生成されたメモリ: {finalResponse}");
-        // memoryに保存
-        memory.Add(finalResponse + $"\n ({TimeUtil.GetCurrentTimeString()})");
-        // MaxMemorySize 個を超えたら古いものから削除
-        if (memory.Count > MaxMemorySize)
+        Debug.Log($"[Friend Ham]生成されたメモリ: {summaryResult}");
+        // memoryに保存（失敗・空の要約は追加しない。MaxMemorySize 個を超えたら古いものから削除）
+        if (StatusRules.TryAppendMemory(memory, summaryResult, TimeUtil.GetCurrentTimeString(), MaxMemorySize))
         {
-            memory.RemoveAt(0);
+            // ここで履歴を保存する
+            SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamMemory = memory);
         }
-
-        // ここで履歴を保存する
-        SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamMemory = memory);
 
         // 会話時間のリストも保存
         // SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.speakHistory = speakHistory);
@@ -586,19 +647,17 @@ public class FriendHamStatus : MonoBehaviour
         }
         // 友ハムの各種ステータスも更新して保存する
         Debug.Log("[Friend Ham]Valenceステータスを更新中...");
-        // ValenceをLLMに計算させる
+        // ValenceをLLMに計算させる（失敗したら会話前の値のまま）
+        LlmResult valenceResult = null;
         yield return StartCoroutine(
-        llmBridge.GetLLMStructuredOutputResponse(
-            resultType: "number",
-            name: "return_calculation",
-            description: "Returns the result of a calculation",
+        llmBridge.Score(
             "以下の会話データから、ハムスターの感情価(Valence)を算出してください。(0~100の範囲で数値を返してください）\n" +
             "会話データ:" +
-            conversationHistory.MessagesToString() +
+            ConversationRules.FormatForPrompt(conversationHistory.messages, summaryInstruction, ConversationPromptBudget) +
             "\n会話前のValence:" + Valence.ToString(),
-            onComplete: result => Valence = Mathf.Clamp((int)result, 0, 100),
-            onError: error => Debug.LogError(error)
+            r => valenceResult = r
         ));
+        Valence = StatusRules.ApplyScore(Valence, valenceResult);
         Debug.Log($"[Friend Ham]ステータス更新完了: Valence={Valence}");
         // SaveDaoを使って保存
         SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamValence = Valence);
@@ -615,19 +674,17 @@ public class FriendHamStatus : MonoBehaviour
         }
         // 友ハムの各種ステータスも更新して保存する
         Debug.Log("[Friend Ham]Arousalステータスを更新中...");
-        // ArousalをLLMに計算させる
+        // ArousalをLLMに計算させる（失敗したら会話前の値のまま）
+        LlmResult arousalResult = null;
         yield return StartCoroutine(
-        llmBridge.GetLLMStructuredOutputResponse(
-            resultType: "number",
-            name: "return_calculation",
-            description: "Returns the result of a calculation",
+        llmBridge.Score(
             "以下の会話データから、ハムスターの覚醒度(Arousal)を算出してください。(0~100の範囲で数値を返してください）\n" +
             "会話データ:" +
-            conversationHistory.MessagesToString() +
+            ConversationRules.FormatForPrompt(conversationHistory.messages, summaryInstruction, ConversationPromptBudget) +
             "\n会話前のArousal:" + Arousal.ToString(),
-            onComplete: result => Arousal = Mathf.Clamp((int)result, 0, 100),
-            onError: error => Debug.LogError(error)
+            r => arousalResult = r
         ));
+        Arousal = StatusRules.ApplyScore(Arousal, arousalResult);
         Debug.Log($"[Friend Ham]ステータス更新完了: Arousal={Arousal}");
         // SaveDaoを使って保存
         SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamArousal = Arousal);
@@ -652,7 +709,7 @@ public class FriendHamStatus : MonoBehaviour
     //         "以下の会話データから、ハムスターの親密度(Closeness)を算出してください。(0~100の範囲で数値を返してください）\n" +
     //         "最後に会話をしてから時間が経過していたら、経過している時間が長いほど親密度を下げてください。" +
     //         "会話データ:" +
-    //         conversationHistory.MessagesToString() +
+    //         ConversationRules.FormatForPrompt(conversationHistory.messages, summaryInstruction, ConversationPromptBudget) +
     //         "\n最後に会話をした時間:" + ExtractDateTime(memory) + 
     //         "\n現在の時間:" + TimeUtil.GetCurrentTimeString() +
     //         "\n会話前のCloseness:" + Closeness.ToString(),
@@ -718,20 +775,20 @@ public class FriendHamStatus : MonoBehaviour
         //     onComplete: result => CurrentMood = result.ToString(),
         //     onError: error => Debug.LogError(error)
         // ));
+        LlmResult moodResult = null;
         yield return StartCoroutine(
-            llmBridge.GetLLMResponse(
+            llmBridge.Chat(
                 "以下のValenceとArousalデータから、ハムスターの現在の感情を一言で表現してください。(例: '喜び', '悲しみ', '怒り'など）\n" +
                 "会話後のValence:" + Valence.ToString() +
                 "\n会話後のArousal:" + Arousal.ToString(),  // システムメッセージ
                 new Message[] {
                     new Message {role = "user", content = "必ず4文字以内で、感情のみを回答してください。"}
                 },
-                (partialText) =>
-                {
-                    CurrentMood = partialText;
-                }
+                r => moodResult = r
             )
         );
+        // 失敗・空の応答なら今の気分のまま
+        CurrentMood = StatusRules.ApplyMood(CurrentMood, moodResult);
         Debug.Log($"[Friend Ham]ステータス更新完了: CurrentMood={CurrentMood}");
         // SaveDaoを使って保存
         SaveDao.UpdateData(PlayerPrefs.GetString("userName", "default"), data => data.friendHamCurrentMood = CurrentMood);

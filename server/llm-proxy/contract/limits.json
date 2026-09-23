@@ -1,0 +1,8 @@
+{
+  "$comment": "Worker（src/validate.ts）と Unity（Assets/Scripts/LLMControler/Core/LlmLimits.cs）が共有する入力の上限。文字数は UTF-16 のコード単位（JS の length、C# の string.Length）で数える。両方のテストがこの値と一致することを確認する。",
+  "systemMaxChars": 20000,
+  "messagesMaxCount": 100,
+  "messagesMaxTotalChars": 60000,
+  "promptMaxChars": 30000,
+  "bodyMaxBytes": 1000000
+}

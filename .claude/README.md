@@ -32,6 +32,7 @@ Claude Code が「ブランチを切る → テスト設計 → 実装 → 監�
     record-review.ps1    レビュー結果を HEAD に紐づけて review-record.json に記録する
     checks/
       unity-tests.ps1    Unity Test Runner を batchmode で実行するアダプタ（Unity プロジェクト用）
+      vitest-tests.ps1   vitest を実行し、テストケースを仕様書用の cases に変換するアダプタ（Node プロジェクト用）
       lib/NUnitResults.ps1  NUnit 3 形式の結果 XML を件数とテストケース一覧に変換する
   agents/                test-designer / test-auditor / test-runner / pr-reviewer / issue-developer
   skills/                feature / github-issue-development / ship-pr / sync-main / dev / deploy
@@ -96,7 +97,7 @@ Claude Code が「ブランチを切る → テスト設計 → 実装 → 監�
 | 種別 | checks の例 |
 |---|---|
 | Unity | `.\.claude\scripts\checks\unity-tests.ps1 -Platform EditMode`（エディタを閉じて実行） |
-| Node / TypeScript | `npm test`、`npm run typecheck`、`npm run lint` |
+| Node / TypeScript | `.\.claude\scripts\checks\vitest-tests.ps1 -Path <package.json のあるディレクトリ>`（仕様書に載る）、`npm run typecheck`、`npm run lint` |
 | Python | `uv run pytest`、`uv run ruff check .` |
 | .NET | `dotnet test` |
 
