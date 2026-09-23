@@ -79,6 +79,8 @@ public class FriendHamStatus : MonoBehaviour
     public List<long> speakHistoryLong;
 
     private bool canSpeak = false;
+    // checkSpeak でサーバー時刻を確かめられなかった（PlayFab の失敗・タイムアウト）なら true
+    private bool speakCheckFailed = false;
     // checkSpeak が今回の会話として記録した時刻。LLM が失敗したら、この記録だけを取り消して回数を返す。
     private DateTime lastSpeakTime;
 
@@ -216,6 +218,10 @@ public class FriendHamStatus : MonoBehaviour
 
     void OnDisable()
     {
+        // 非アクティブ化で止まったコルーチンは後処理（CoroutineFlow.Guard の finally）が走らないので、ここで戻す。
+        // 戻さないと、再びアクティブになったときに以後の送信がすべて弾かれる。
+        IsSpeaking = false;
+
         // 会話をしていれば会話履歴を更新する
         if (conversationHistory.messages.Count > 1){
             // 会話履歴を保存しておく
@@ -356,7 +362,10 @@ public class FriendHamStatus : MonoBehaviour
         if (!canSpeak)
         {
             Debug.Log("yield break");
-            finalResponse = "ぼくとは1時間に"+ MAX_SPEAKS_PER_HOUR + "回しか話せないみたい...!";
+            // 時刻を確かめられなかったときは、上限に達したのとは別の理由を伝える
+            finalResponse = speakCheckFailed
+                ? "いまちょっと時計が読めないみたい…少し待ってから、もう一度話しかけてね！"
+                : "ぼくとは1時間に"+ MAX_SPEAKS_PER_HOUR + "回しか話せないみたい...!";
             onUpdate?.Invoke(finalResponse);
             onComplete?.Invoke(finalResponse);
             yield break;
@@ -458,6 +467,7 @@ public class FriendHamStatus : MonoBehaviour
         if(speakHistory == null) speakHistory = new List<DateTime>();
 
         canSpeak = false;
+        speakCheckFailed = false;
         bool isWaiting = true;
         // 時刻の取得が返ってこないと会話がずっと始まらないので、一定時間で諦めて「話せない」扱いにする。
         // 諦めた後に届いた応答は無視する（記録だけが増えて会話回数が減るのを防ぐ）。
@@ -497,6 +507,7 @@ public class FriendHamStatus : MonoBehaviour
                 if (abandoned) return;
                 Debug.LogError("playfab error:" + error.GenerateErrorReport());
                 canSpeak = false;
+                speakCheckFailed = true;
                 isWaiting = false;
             }
         );
@@ -509,6 +520,7 @@ public class FriendHamStatus : MonoBehaviour
                 Debug.LogError("サーバー時刻の取得がタイムアウトしました。");
                 abandoned = true;
                 canSpeak = false;
+                speakCheckFailed = true;
                 break;
             }
             yield return null;
