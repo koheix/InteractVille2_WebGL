@@ -165,6 +165,10 @@ public class FriendHamDialogueSystem : DialogueSystem
     // chat送信ボタンのイベント
     void OnSendButtonClicked()
     {
+        // ともハムが返事を考えている間は送らない（入力は消さずに残す）。
+        // 通信中に次の会話が始まると、会話回数の返却や履歴の巻き戻しが入り組むため。
+        if (friendHamStatus.IsSpeaking) return;
+
         string playerMessage = chatInputField.text;
         // メッセージが空でない場合のみ処理
         if (!string.IsNullOrEmpty(playerMessage))
