@@ -2,15 +2,17 @@
 //
 //   POST /chat   { system, messages } → { text }       会話・記憶の要約・気分
 //   POST /score  { prompt }           → { result }     親密度などのスコア（0〜100 の整数）
-//   POST /       Claude Messages API をそのまま中継   公開中の古い WebGL ビルド用（LEGACY_CLAUDE_PASSTHROUGH）
+//
+// 以前あった旧 API（POST / で Claude Messages API をそのまま中継）は、古いビルドが指定していた
+// Claude のモデルが廃止されて使われなくなったので削除した。Claude の API キーを誰でも使える中継を残さないため。
 //
 // 失敗は { error: 種別 } で返す（種別と HTTP ステータスは errors.ts の ERROR_STATUS）。
 // どの応答にも CORS ヘッダを付ける。付け忘れるとブラウザが応答を捨て、Unity からは
 // 通信エラーにしか見えなくなる（「今日はもう話せない」が表示できない）。
 
-import { isLegacyEnabled, readAllowedOrigins, readConfig } from './config';
+import { readAllowedOrigins, readConfig } from './config';
 import { ERROR_STATUS } from './errors';
-import { CLAUDE_URL, CLAUDE_VERSION, createClaudeProvider, createWorkersAiProvider } from './providers';
+import { createClaudeProvider, createWorkersAiProvider } from './providers';
 import { normalizeScore } from './score';
 import { type Env, type ErrorKind, type FetchLike, type Provider, ProxyError, type ScoreRequest } from './types';
 import { parseChatRequest, parseScoreRequest, readJsonBody } from './validate';
@@ -59,32 +61,7 @@ function createProvider(env: Env, deps: Deps): Provider {
   return config.provider === 'claude' ? createClaudeProvider(deps.fetch, config) : createWorkersAiProvider(env.AI, config);
 }
 
-// 旧 API。公開中の古いビルドが送る Claude Messages API の本文を、そのまま Claude に中継する。
-// 古いビルドは Claude の形式で応答を読むので、失敗時も上流のステータスと本文をそのまま返す
-// （「上流の本文は返さない」という規約の例外。元の worker.js と同じ動きで、移行が済んだら削除する）。
-async function legacyPassthrough(request: Request, env: Env, deps: Deps, cors: CorsHeaders): Promise<Response> {
-  const body = await readJsonBody(request);
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new ProxyError('bad_request');
-  if (env.CLAUDE_API_KEY === undefined || env.CLAUDE_API_KEY === '') throw new ProxyError('config');
-
-  (body as Record<string, unknown>).stream = false;
-  let upstream: Response;
-  try {
-    upstream = await deps.fetch(CLAUDE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': env.CLAUDE_API_KEY, 'anthropic-version': CLAUDE_VERSION },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    throw new ProxyError('upstream');
-  }
-  return new Response(await upstream.text(), {
-    status: upstream.status,
-    headers: { 'Content-Type': 'application/json', ...cors },
-  });
-}
-
-const ROUTES = new Set(['/chat', '/score', '/']);
+const ROUTES = new Set(['/chat', '/score']);
 
 export function createHandler(deps: Deps) {
   return async function handle(request: Request, env: Env): Promise<Response> {
@@ -92,16 +69,15 @@ export function createHandler(deps: Deps) {
     const path = new URL(request.url).pathname;
 
     if (!cors.allowed) return errorResponse('forbidden', cors.headers);
-    if (!ROUTES.has(path) || (path === '/' && !isLegacyEnabled(env))) return errorResponse('not_found', cors.headers);
+    if (!ROUTES.has(path)) return errorResponse('not_found', cors.headers);
 
     if (request.method === 'OPTIONS') {
-      const allowHeaders = isLegacyEnabled(env) ? 'Content-Type, anthropic-version' : 'Content-Type';
       return new Response(null, {
         status: 204,
         headers: {
           ...cors.headers,
           'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': allowHeaders,
+          'Access-Control-Allow-Headers': 'Content-Type',
           'Access-Control-Max-Age': '86400',
         },
       });
@@ -109,8 +85,6 @@ export function createHandler(deps: Deps) {
     if (request.method !== 'POST') return errorResponse('method_not_allowed', cors.headers);
 
     try {
-      if (path === '/') return await legacyPassthrough(request, env, deps, cors.headers);
-
       const body = await readJsonBody(request);
       if (path === '/chat') {
         const chatRequest = parseChatRequest(body);

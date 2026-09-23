@@ -22,13 +22,10 @@
     "SCORE_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
 
     // Claude に切り戻したときのモデル。API キーは secret の CLAUDE_API_KEY（wrangler secret put CLAUDE_API_KEY）。
-    "CLAUDE_MODEL": "claude-sonnet-4-20250514",
+    // モデルは廃止されることがある（claude-sonnet-4-20250514 は廃止済み）。切り戻す前に使えるか確かめる。
+    "CLAUDE_MODEL": "claude-sonnet-5",
 
     // ブラウザからの呼び出しを許す Origin（カンマ区切り）。Origin ヘッダの無い呼び出し（Unity エディタなど）は通す。
-    "ALLOWED_ORIGINS": "https://koheix.github.io",
-
-    // 公開中の古い WebGL ビルドが使う旧 API（POST / で Claude の Messages API へそのまま中継）。
-    // 新しいビルドを公開したら "false" にし、その後コードごと削除する。
-    "LEGACY_CLAUDE_PASSTHROUGH": "true"
+    "ALLOWED_ORIGINS": "https://koheix.github.io"
   }
 }

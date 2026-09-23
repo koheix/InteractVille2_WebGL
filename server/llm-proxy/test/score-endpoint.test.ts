@@ -95,7 +95,7 @@ describe('POST /score（Claude に切り戻したとき）', () => {
     const body = JSON.parse((res.fetch.mock.calls[0] as [string, RequestInit])[1].body as string);
     expect(body.tool_choice).toEqual({ type: 'tool', name: 'return_score' });
     expect(body.tools[0].name).toBe('return_score');
-    expect(body.model).toBe('claude-sonnet-4-20250514');
+    expect(body.model).toBe('claude-sonnet-5');
   });
 
   it('SCORE_MODEL を変えれば、そのモデルで問い合わせる', async () => {

@@ -118,7 +118,7 @@ describe('POST /chat（Claude に切り戻したとき）', () => {
     expect(url).toBe('https://api.anthropic.com/v1/messages');
     expect(init.headers).toMatchObject({ 'x-api-key': 'sk-test-key', 'anthropic-version': '2023-06-01' });
     expect(JSON.parse(init.body as string)).toEqual({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 1024,
       system: 'あなたは親しみやすい友達のハムスターです。',
       messages: [{ role: 'user', content: 'こんにちは！' }],
