@@ -84,25 +84,32 @@ describe('削除した旧 API（Claude への素通し）', () => {
   // 以前の古いビルドが送っていた Claude Messages API 形式の本文
   const legacyBody = { model: 'claude-sonnet-5', max_tokens: 1024, messages: [{ role: 'user', content: 'a' }], stream: false };
 
-  it('POST / は 404 で、Claude も Workers AI も呼ばない（Claude の API キーを使う中継を誰にも使わせない）', async () => {
-    // 以前の設定値（LEGACY_CLAUDE_PASSTHROUGH: "true"）がダッシュボードなどに残っていても効かないこと
-    const env = { ...makeEnv(async () => responsesOutput('ok')), LEGACY_CLAUDE_PASSTHROUGH: 'true' };
-    const res = await call(env, '/', legacyBody, { headers: { 'anthropic-version': '2023-06-01' } });
+  // 以前の設定値（LEGACY_CLAUDE_PASSTHROUGH: "true"）がダッシュボードなどに残っていても効かないことを確かめる
+  const envWithOldSetting = () => ({ ...makeEnv(async () => responsesOutput('ok')), LEGACY_CLAUDE_PASSTHROUGH: 'true' });
+
+  it.each([
+    ['ブラウザ（許可された Origin）', ORIGIN],
+    ['curl など（Origin ヘッダなし）', null],
+  ])('POST / は %s からでも 404 で、Claude も Workers AI も呼ばない（Claude の API キーを使う中継を誰にも使わせない）', async (_label, origin) => {
+    const env = envWithOldSetting();
+    const res = await call(env, '/', legacyBody, { origin, headers: { 'anthropic-version': '2023-06-01' } });
     expect(res.status).toBe(404);
     expect(res.json).toEqual({ error: 'not_found' });
     expect(res.fetch).not.toHaveBeenCalled();
     expect(env.AI.run).not.toHaveBeenCalled();
+  });
+
+  it('/ へのプリフライトも 404 で、許可メソッド・許可ヘッダを返さず、CORS の Allow-Origin だけ付ける', async () => {
+    const res = await call(envWithOldSetting(), '/', undefined, { method: 'OPTIONS' });
+    expect(res.status).toBe(404);
+    expect(res.json).toEqual({ error: 'not_found' });
+    expect(res.headers.get('Access-Control-Allow-Methods')).toBeNull();
+    expect(res.headers.get('Access-Control-Allow-Headers')).toBeNull();
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ORIGIN);
   });
 
-  it('/ へのプリフライトも 404 で、許可ヘッダを返さない', async () => {
-    const res = await call(makeEnv(), '/', undefined, { method: 'OPTIONS' });
-    expect(res.status).toBe(404);
-    expect(res.headers.get('Access-Control-Allow-Methods')).toBeNull();
-  });
-
-  it('/chat のプリフライトは Content-Type だけを許可する（anthropic-version は許可しない）', async () => {
-    const res = await call(makeEnv(), '/chat', undefined, { method: 'OPTIONS' });
+  it.each(['/chat', '/score'])('%s のプリフライトは Content-Type だけを許可する（以前の設定値が残っていても anthropic-version は許可しない）', async (path) => {
+    const res = await call(envWithOldSetting(), path, undefined, { method: 'OPTIONS' });
     expect(res.status).toBe(204);
     expect(res.headers.get('Access-Control-Allow-Headers')).toBe('Content-Type');
   });
