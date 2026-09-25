@@ -183,11 +183,13 @@ PR 前の検証はこれだけを実行すればよい（`.claude/harness.json` 
 
 MCP for Unity で、起動中の Unity エディタを Claude Code から操作できる（GameObject・コンポーネントの配置、
 シーンの編集、スクリプトの作成、コンソールの確認、スクリーンショット、テストの実行など）。
-操作の手順と注意は `unity-mcp` スキルに従う。
+操作の手順と注意は `unity-mcp-orchestrator` スキルに従う（MCP for Unity がユーザー設定の
+`~/.claude/skills/unity-mcp-skill/` に入れるもので、リポジトリには無い）。
 
 ### 準備（利用者が行う。PC ごとに 1 回）
 1. Unity エディタでこのプロジェクトを開く（パッケージは `Packages/manifest.json` に入っているので自動で入る）
-2. `Window → MCP for Unity` でサーバーを起動し、「Configure All Detected Clients」で Claude Code を登録する
+2. `Window → MCP for Unity` でサーバーを起動し、「Configure All Detected Clients」で Claude Code を登録する。
+   サーバーの起動には Python 3.10 以上と `uv` が必要（無いと「uv Not Found」になる。ウィンドウの案内に従って入れる）
    （ユーザー設定に `UnityMCP`（`http://127.0.0.1:8080/mcp`）が登録される。プロジェクトに設定ファイルは作られない）
 3. `claude mcp list` で `UnityMCP` が Connected になっていることを確かめる。Claude Code の起動後に登録したときは、
    Claude Code を再起動しないとツールが見えない
