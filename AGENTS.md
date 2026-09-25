@@ -204,6 +204,10 @@ MCP for Unity で、起動中の Unity エディタを Claude Code から操作�
 3. `claude mcp list` で `UnityMCP` が Connected になっていることを確かめる。Claude Code の起動後に登録したときは、
    Claude Code を再起動しないとツールが見えない
 
+**エディタを開き直したとき**は、既定ではサーバーが自動で起動しない（MCP のツールが「接続拒否（ECONNREFUSED）」で使えなくなる）。
+利用者に `Window → MCP for Unity` でサーバーを起動してもらい、Claude Code で `/mcp` から `UnityMCP` に再接続する。
+毎回の手間を省くなら、同じウィンドウでエディタの起動時に自動で起動する設定を有効にしてもらう。
+
 ### 操作するときの決まり
 - **エディタは利用者が開いておく。** Claude Code がエディタを起動・終了しない
 - 操作の前に `mcpforunity://editor/state` で状態（コンパイル中でないか、Play Mode でないか、開いているシーン）を確かめる。
