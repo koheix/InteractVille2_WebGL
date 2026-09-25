@@ -167,7 +167,8 @@ PR 前の検証はこれだけを実行すればよい（`.claude/harness.json` 
 - 中身は次の 3 つ
   1. LLM プロキシの vitest（`.claude/scripts/checks/vitest-tests.ps1 -Path server\llm-proxy`。`node_modules` が無ければ `npm ci` する）
   2. LLM プロキシの型チェック（`npm --prefix server/llm-proxy run typecheck`）
-  3. Unity を batchmode で起動し、スクリプトのコンパイルと EditMode テスト（`.claude/scripts/checks/unity-tests.ps1 -Platform EditMode -Worktree ..\InteractVille2_webGL.ci`）
+  3. Unity を batchmode で起動し、スクリプトのコンパイルと EditMode テスト（`.claude/scripts/checks/unity-tests.ps1 -Platform EditMode -Worktree ..\InteractVille2_webGL.ci -BuildTarget WebGL`。
+     公開と同じ WebGL の条件でコンパイルを確かめる）
 - **Unity の検証は専用の作業コピーで行う**ので、利用者がエディタを開いたままでも実行できる
   - 専用の作業コピーは `C:\UnityProjects\InteractVille2_webGL.ci`（リポジトリの隣。git worktree で、`Library/` も別）。
     無ければ自動で作る。検証のたびにリポジトリの HEAD に合わせ、コミットされていないファイルを消す（`Library/` は残す）
@@ -176,6 +177,9 @@ PR 前の検証はこれだけを実行すればよい（`.claude/harness.json` 
     `.\.claude\scripts\unity-worktree-run.ps1 -Worktree ..\InteractVille2_webGL.ci -LogFile <ログ> -UnityArgs '-quit','-nographics'` で準備しておける
   - 専用の作業コピーで別の検証やビルドが動いている間は、失敗してその旨を返す。終わってから再実行する
   - 実行中は Unity が 2 つ動くので、エディタが重くなることがある
+  - 専用の作業コピーはスクリプトが作ったもの（`git worktree lock` の印 `harness-unity-worktree` がある）にしか触らない。
+    作り直すときは `git worktree unlock ..\InteractVille2_webGL.ci; git worktree remove --force ..\InteractVille2_webGL.ci`
+    （次の検証で自動で作り直す。フォルダだけを消した場合も、次の検証で作り直す）
 - 数分かかるので、バックグラウンドで実行する
 - Unity のインストール先が既定（`C:\Program Files\Unity\Hub\Editor\<バージョン>\`）と違う場合は
   環境変数 `UNITY_EDITOR_PATH` に `Unity.exe` のパスを設定する

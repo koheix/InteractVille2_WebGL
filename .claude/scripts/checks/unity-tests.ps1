@@ -11,8 +11,11 @@
 #   3. Unity Hub の既定の場所（ProjectSettings\ProjectVersion.txt のバージョン）
 #
 # 同じプロジェクトを Unity エディタで開いたままだと batchmode は起動できない。
-# -Worktree を指定すると、リポジトリの専用の作業コピー（git worktree、Library も別）を HEAD に合わせて
+# -Worktree を指定すると、リポジトリの専用の作業コピー（git worktree、Library も別）を検証するコミットに合わせて
 # そちらで実行するので、利用者がエディタを開いたままでも検証できる。検証されるのはコミット済みの内容だけになる。
+# 検証するコミットは -Commit、無ければ環境変数 HARNESS_COMMIT（run-checks.ps1 が記録するコミットを渡す）、
+# それも無ければ HEAD。記録のコミットと検証したコミットがずれないようにするため。
+# Unity プロジェクトがリポジトリのサブフォルダにあるときは、作業コピーでも同じサブフォルダを使う。
 # -Worktree を指定しないときは、エディタで開かれていれば実行せずに失敗として返す。
 
 param(
@@ -20,6 +23,10 @@ param(
     [string]$ProjectPath = (Get-Location).Path,
     # 専用の作業コピーの場所（相対パスはリポジトリのルートから）。例: ..\MyProject.ci
     [string]$Worktree,
+    [string]$Commit,
+    # アクティブなビルドターゲット（例: WebGL）。固定しないと、作業コピーで前に何をしたかで
+    # コンパイル時の define（UNITY_WEBGL など）が変わる。
+    [string]$BuildTarget,
     [string]$UnityPath = $env:UNITY_EDITOR_PATH,
     [int]$TimeoutMinutes = 30,
     # 特定のテストだけを走らせる（Unity の -testFilter にそのまま渡す）。
@@ -59,7 +66,7 @@ function Complete-Check {
 
 $ProjectPath = (Resolve-Path -LiteralPath $ProjectPath).Path
 
-# --- 専用の作業コピーを HEAD に合わせる ---
+# --- 専用の作業コピーを検証するコミットに合わせる ---
 $location = ''
 if ($Worktree) {
     $gitExe = Get-GitExe
@@ -67,13 +74,18 @@ if ($Worktree) {
     if (-not $repoRoot) {
         Complete-Check -Failed 1 -ExitCode 3 -Summary '-Worktree を使うには git リポジトリの中で実行する必要があります。'
     }
+    if ([string]::IsNullOrWhiteSpace($Commit)) {
+        $Commit = if ([string]::IsNullOrWhiteSpace($env:HARNESS_COMMIT)) { 'HEAD' } else { $env:HARNESS_COMMIT }
+    }
+    # リポジトリのルートから見た Unity プロジェクトの位置（ルートそのものなら空）。
+    $subPath = $ProjectPath.Substring($repoRoot.TrimEnd('\').Length).TrimStart('\')
     try {
-        Write-Host '専用の作業コピーを HEAD に合わせています…'
-        $synced = Sync-UnityWorktree -GitExe $gitExe -RepoRoot $repoRoot -Path $Worktree -Commit 'HEAD'
+        Write-Host "専用の作業コピーを $Commit に合わせています…"
+        $synced = Sync-UnityWorktree -GitExe $gitExe -RepoRoot $repoRoot -Path $Worktree -Commit $Commit
     } catch {
         Complete-Check -Failed 1 -ExitCode 3 -Summary $_.Exception.Message
     }
-    $ProjectPath = $synced.Path
+    $ProjectPath = if ($subPath) { Join-Path $synced.Path $subPath } else { $synced.Path }
     $location = "（専用の作業コピー $($synced.Path) @ $($synced.Commit.Substring(0, 7))）"
 }
 
@@ -124,6 +136,7 @@ $arguments = @(
 # PlayMode は描画を伴うテストがあり得るので -nographics を付けない。
 if ($Platform -eq 'EditMode') { $arguments += '-nographics' }
 if ($TestFilter) { $arguments += @('-testFilter', "`"$TestFilter`"") }
+if ($BuildTarget) { $arguments += @('-buildTarget', $BuildTarget) }
 
 Write-Host "Unity $version で $Platform テストを実行します（初回や Library 再構築時は数分かかります）…"
 $started = Get-Date

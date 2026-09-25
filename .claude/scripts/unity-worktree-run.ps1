@@ -1,16 +1,17 @@
 ﻿# 専用の作業コピー（git worktree）で Unity を batchmode で実行する。
 # エディタでプロジェクトを開いたままでも、ビルドなどを実行できる。
 #
-#   # 例：origin/main を WebGL でビルドする
-#   $env:IV2_WEBGL_OUT = "<出力先>\IV2_WebGL_ver1_0_0"
-#   .\.claude\scripts\unity-worktree-run.ps1 -Worktree ..\InteractVille2_webGL.ci -Commit origin/main `
-#       -LogFile <ログのパス> -UnityArgs '-buildTarget', 'WebGL', '-executeMethod', 'WebGLBuilder.Build', '-nographics'
+#   # 例：origin/main をビルドする（ビルド用のメソッドはプロジェクトごとに用意する）
+#   .\.claude\scripts\unity-worktree-run.ps1 -Worktree ..\<プロジェクト名>.ci -Commit origin/main `
+#       -LogFile <ログのパス> -UnityArgs '-buildTarget', 'WebGL', '-executeMethod', '<クラス>.<メソッド>', '-nographics'
 #
 #   # 例：インポートだけ済ませておく（初回の準備。全アセットのインポートに時間がかかる）
-#   .\.claude\scripts\unity-worktree-run.ps1 -Worktree ..\InteractVille2_webGL.ci -LogFile <ログのパス> -UnityArgs '-quit', '-nographics'
+#   .\.claude\scripts\unity-worktree-run.ps1 -Worktree ..\<プロジェクト名>.ci -LogFile <ログのパス> -UnityArgs '-quit', '-nographics'
 #
 # -Commit を省くと、リポジトリ本体の HEAD（コミット済みの内容）を使う。
 # 作業コピーは指定したコミットに合わせ、コミットされていないファイルは消す（Library\ は残す）。
+# Unity プロジェクトがリポジトリのサブフォルダにあるときは -ProjectSubPath に指定する。
+# -UnityArgs の各値は空白で連結して Unity に渡すので、空白を含む値は使えない（パスは空白の無い場所を使う）。
 # 終了コードは Unity の終了コード（作業コピーの準備に失敗したら 3、時間切れなら 4）。
 
 param(
@@ -18,6 +19,7 @@ param(
     [string]$Commit = 'HEAD',
     [Parameter(Mandatory)][string]$LogFile,
     [string[]]$UnityArgs = @(),
+    [string]$ProjectSubPath = '',
     [string]$UnityPath = $env:UNITY_EDITOR_PATH,
     [int]$TimeoutMinutes = 90
 )
@@ -43,7 +45,12 @@ try {
 }
 Write-Host "専用の作業コピー: $($synced.Path)（コミット $($synced.Commit.Substring(0, 7))）"
 
-$versionFile = Join-Path $synced.Path 'ProjectSettings\ProjectVersion.txt'
+$projectPath = if ($ProjectSubPath) { Join-Path $synced.Path $ProjectSubPath } else { $synced.Path }
+$versionFile = Join-Path $projectPath 'ProjectSettings\ProjectVersion.txt'
+if (-not (Test-Path -LiteralPath $versionFile)) {
+    Write-Host "✘ Unity プロジェクトではありません（$versionFile がありません）。-ProjectSubPath を確かめてください。"
+    exit 3
+}
 $version = $null
 foreach ($line in (Get-Content -LiteralPath $versionFile -Encoding UTF8)) {
     if ($line -match '^m_EditorVersion:\s*(\S+)') { $version = $Matches[1]; break }
@@ -58,7 +65,7 @@ if (-not (Test-Path -LiteralPath $UnityPath)) {
 
 $LogFile = [System.IO.Path]::GetFullPath($LogFile)
 New-Item -ItemType Directory -Force -Path (Split-Path $LogFile) | Out-Null
-$arguments = @('-batchmode', '-projectPath', "`"$($synced.Path)`"", '-logFile', "`"$LogFile`"") + $UnityArgs
+$arguments = @('-batchmode', '-projectPath', "`"$projectPath`"", '-logFile', "`"$LogFile`"") + $UnityArgs
 
 Write-Host "Unity $version を実行します: $($UnityArgs -join ' ')"
 $started = Get-Date

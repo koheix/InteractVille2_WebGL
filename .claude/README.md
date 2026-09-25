@@ -92,6 +92,7 @@ Claude Code が「ブランチを切る → テスト設計 → 実装 → 監�
   }
   ```
 - 追加の出力ファイルは環境変数 `HARNESS_CHECK_OUTPUT_DIR`（`<reportsDir>/logs`）に置く
+- 記録するコミットは環境変数 `HARNESS_COMMIT` で渡る。コミットを取り出して検証するアダプタ（`unity-tests.ps1 -Worktree`）はこれを使う
 - `checks` が空だと run-checks は失敗扱いになる（何も検証していない記録でゲートを通さないため）
 
 プロジェクト種別ごとの例:
