@@ -106,6 +106,9 @@ exit `$LASTEXITCODE
 
     $env:HARNESS_CHECK_RESULT = $resultPath
     $env:HARNESS_CHECK_OUTPUT_DIR = $logsDir
+    # 記録するコミット。専用の作業コピーで検証するアダプタは、HEAD を解決し直さずにこれを使う
+    # （実行中にコミットされても、記録と検証した内容がずれないように）。
+    $env:HARNESS_COMMIT = $head
     try {
         $process = Start-Process -FilePath 'powershell.exe' `
             -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$scriptPath`"") `
@@ -125,6 +128,7 @@ exit `$LASTEXITCODE
     } finally {
         Remove-Item Env:\HARNESS_CHECK_RESULT -ErrorAction SilentlyContinue
         Remove-Item Env:\HARNESS_CHECK_OUTPUT_DIR -ErrorAction SilentlyContinue
+        Remove-Item Env:\HARNESS_COMMIT -ErrorAction SilentlyContinue
     }
 
     # 標準エラーは標準出力のログの末尾にまとめる。
