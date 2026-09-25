@@ -37,7 +37,9 @@ Claude Code が「ブランチを切る → テスト設計 → 実装 → 監�
       vitest-tests.ps1   vitest を実行し、テストケースを仕様書用の cases に変換するアダプタ（Node プロジェクト用）
       lib/NUnitResults.ps1  NUnit 3 形式の結果 XML を件数とテストケース一覧に変換する
   agents/                test-designer / test-auditor / test-runner / pr-reviewer / issue-developer
-  skills/                feature / github-issue-development / ship-pr / sync-main / dev / deploy
+  skills/                create-issue / feature / github-issue-development / ship-pr / sync-main / dev / deploy
+                         （要件を Issue にするだけなら create-issue、すぐ実装するなら feature、
+                          Issue を起点に実装するなら github-issue-development）
   state/                 セッションローカルな状態（自身の .gitignore で git から除外）
 ```
 
