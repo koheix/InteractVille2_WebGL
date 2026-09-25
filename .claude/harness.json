@@ -22,7 +22,7 @@
     },
     {
       "name": "Unity EditMode テスト（コンパイル確認を含む）",
-      "command": ".\\.claude\\scripts\\checks\\unity-tests.ps1 -Platform EditMode",
+      "command": ".\\.claude\\scripts\\checks\\unity-tests.ps1 -Platform EditMode -Worktree ..\\InteractVille2_webGL.ci",
       "timeoutMinutes": 35
     }
   ],

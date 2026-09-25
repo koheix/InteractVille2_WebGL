@@ -30,6 +30,8 @@ Claude Code が「ブランチを切る → テスト設計 → 実装 → 監�
     run-checks.ps1       harness.json の checks を実行し、verification.json・test-report.md・
                          test-spec.md（テスト仕様書）を作る
     record-review.ps1    レビュー結果を HEAD に紐づけて review-record.json に記録する
+    unity-worktree-run.ps1  専用の作業コピー（git worktree）で Unity を batchmode 実行する（ビルドなど）
+    lib/UnityWorktree.ps1   専用の作業コピーを作る・指定のコミットに合わせる・使用中か調べる
     checks/
       unity-tests.ps1    Unity Test Runner を batchmode で実行するアダプタ（Unity プロジェクト用）
       vitest-tests.ps1   vitest を実行し、テストケースを仕様書用の cases に変換するアダプタ（Node プロジェクト用）
@@ -96,7 +98,7 @@ Claude Code が「ブランチを切る → テスト設計 → 実装 → 監�
 
 | 種別 | checks の例 |
 |---|---|
-| Unity | `.\.claude\scripts\checks\unity-tests.ps1 -Platform EditMode`（エディタを閉じて実行） |
+| Unity | `.\.claude\scripts\checks\unity-tests.ps1 -Platform EditMode -Worktree ..\<プロジェクト名>.ci`（専用の作業コピーで実行するので、エディタを開いたままでよい。`-Worktree` を省くとリポジトリ本体で実行し、エディタを閉じる必要がある） |
 | Node / TypeScript | `.\.claude\scripts\checks\vitest-tests.ps1 -Path <package.json のあるディレクトリ>`（仕様書に載る）、`npm run typecheck`、`npm run lint` |
 | Python | `uv run pytest`、`uv run ruff check .` |
 | .NET | `dotnet test` |

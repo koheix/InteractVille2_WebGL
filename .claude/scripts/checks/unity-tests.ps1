@@ -11,11 +11,15 @@
 #   3. Unity Hub の既定の場所（ProjectSettings\ProjectVersion.txt のバージョン）
 #
 # 同じプロジェクトを Unity エディタで開いたままだと batchmode は起動できない。
-# その場合は実行せずに失敗として返す（エディタを閉じてから再実行する）。
+# -Worktree を指定すると、リポジトリの専用の作業コピー（git worktree、Library も別）を HEAD に合わせて
+# そちらで実行するので、利用者がエディタを開いたままでも検証できる。検証されるのはコミット済みの内容だけになる。
+# -Worktree を指定しないときは、エディタで開かれていれば実行せずに失敗として返す。
 
 param(
     [ValidateSet('EditMode', 'PlayMode')][string]$Platform = 'EditMode',
     [string]$ProjectPath = (Get-Location).Path,
+    # 専用の作業コピーの場所（相対パスはリポジトリのルートから）。例: ..\MyProject.ci
+    [string]$Worktree,
     [string]$UnityPath = $env:UNITY_EDITOR_PATH,
     [int]$TimeoutMinutes = 30,
     # 特定のテストだけを走らせる（Unity の -testFilter にそのまま渡す）。
@@ -26,6 +30,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'lib\NUnitResults.ps1')
+. (Join-Path $PSScriptRoot '..\..\hooks\lib\Common.ps1')
+. (Join-Path $PSScriptRoot '..\lib\UnityWorktree.ps1')
 
 $resultFile = $env:HARNESS_CHECK_RESULT
 
@@ -52,6 +58,25 @@ function Complete-Check {
 }
 
 $ProjectPath = (Resolve-Path -LiteralPath $ProjectPath).Path
+
+# --- 専用の作業コピーを HEAD に合わせる ---
+$location = ''
+if ($Worktree) {
+    $gitExe = Get-GitExe
+    $repoRoot = if ($gitExe) { Get-RepoRoot -GitExe $gitExe -Directory $ProjectPath } else { $null }
+    if (-not $repoRoot) {
+        Complete-Check -Failed 1 -ExitCode 3 -Summary '-Worktree を使うには git リポジトリの中で実行する必要があります。'
+    }
+    try {
+        Write-Host '専用の作業コピーを HEAD に合わせています…'
+        $synced = Sync-UnityWorktree -GitExe $gitExe -RepoRoot $repoRoot -Path $Worktree -Commit 'HEAD'
+    } catch {
+        Complete-Check -Failed 1 -ExitCode 3 -Summary $_.Exception.Message
+    }
+    $ProjectPath = $synced.Path
+    $location = "（専用の作業コピー $($synced.Path) @ $($synced.Commit.Substring(0, 7))）"
+}
+
 $versionFile = Join-Path $ProjectPath 'ProjectSettings\ProjectVersion.txt'
 if (-not (Test-Path -LiteralPath $versionFile)) {
     Complete-Check -Failed 1 -ExitCode 3 -Summary "Unity プロジェクトではありません（$versionFile がありません）。"
@@ -74,19 +99,10 @@ Unity Hub でこのバージョンをインストールするか、環境変数 
 }
 
 # --- エディタで開かれていないか ---
-# Unity はプロジェクトを開いている間 Temp\UnityLockfile を排他ロックする。
-# ファイルが残っているだけ（異常終了の跡）なら開けるので、実際に開けるかで判定する。
-$lockFile = Join-Path $ProjectPath 'Temp\UnityLockfile'
-if (Test-Path -LiteralPath $lockFile) {
-    try {
-        $stream = [System.IO.File]::Open($lockFile, 'Open', 'ReadWrite', 'None')
-        $stream.Dispose()
-    } catch {
-        Complete-Check -Failed 1 -ExitCode 3 -Summary @"
-Unity エディタでこのプロジェクトが開かれているため、batchmode で検証できません。
-エディタを閉じてから再実行してください（利用者に依頼すること。エディタを勝手に終了させない）。
-"@
-    }
+if (Test-UnityProjectLocked -ProjectPath $ProjectPath) {
+    $hint = if ($Worktree) { '専用の作業コピーで別の検証やビルドが実行中です。終わってから再実行してください。' }
+    else { 'エディタを閉じてから再実行するか、-Worktree で専用の作業コピーを使ってください（エディタを勝手に終了させない）。' }
+    Complete-Check -Failed 1 -ExitCode 3 -Summary "Unity でこのプロジェクトが開かれているため、batchmode で検証できません（$ProjectPath）。$hint"
 }
 
 # --- 実行 ---
@@ -164,6 +180,7 @@ if ($exitCode -ne 0 -and $failed -eq 0) { $failed = 1 }
 
 $summary = "${Platform}: 合計 $total 件（成功 $passed / 失敗 $failed / スキップ $skipped）、$elapsed 秒"
 if ($total -eq 0) { $summary += '。テストは 0 件（コンパイルが通ることのみ確認）' }
+$summary += $location
 
 $code = if ($failed -eq 0) { 0 } else { 1 }
 Complete-Check -Passed $passed -Failed $failed -Skipped $skipped -Failures $failures -Cases $cases `
