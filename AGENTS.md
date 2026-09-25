@@ -23,6 +23,7 @@ WebGL ビルドをブラウザ（PC・スマートフォン）で遊ぶ。遊び
 | LLM | プロキシ（`server/llm-proxy/`、Cloudflare Workers、TypeScript）経由で Workers AI を呼ぶ。会話・要約・気分は `@cf/openai/gpt-oss-120b`、スコア（親密度・感情価・覚醒度）は `@cf/meta/llama-3.3-70b-instruct-fp8-fast` の JSON Mode。設定 1 つで Claude API に切り戻せる。無料枠（1 日 10,000 Neurons、日本時間 9:00 に回復）で運用 |
 | JSON | Newtonsoft.Json（`com.unity.nuget.newtonsoft-json`）と `JsonUtility` |
 | テスト | Unity：Unity Test Framework の EditMode（`Assets/Tests/EditMode/`）。Worker：vitest（`server/llm-proxy/test/`、Node 22.12 以上） |
+| エディタ操作 | MCP for Unity（`com.coplaydev.unity-mcp`、`v10.2.0` に固定）。起動中のエディタを Claude Code から操作する（「Unity MCP でエディタを操作する」参照） |
 
 ## 構成
 
@@ -177,6 +178,36 @@ PR 前の検証はこれだけを実行すればよい（`.claude/harness.json` 
 
 エディタを開いたまま手早くコンパイルやテストを確かめたいときは、Unity MCP が使えればそれを使ってよい
 （ただし PR 作成ゲートの記録は `run-checks.ps1` でしか作られない）。
+
+## Unity MCP でエディタを操作する
+
+MCP for Unity で、起動中の Unity エディタを Claude Code から操作できる（GameObject・コンポーネントの配置、
+シーンの編集、スクリプトの作成、コンソールの確認、スクリーンショット、テストの実行など）。
+操作の手順と注意は `unity-mcp-orchestrator` スキルに従う（MCP for Unity がユーザー設定の
+`~/.claude/skills/unity-mcp-skill/` に入れるもので、リポジトリには無い）。
+
+### 準備（利用者が行う。PC ごとに 1 回）
+1. Unity エディタでこのプロジェクトを開く（パッケージは `Packages/manifest.json` に入っているので自動で入る）
+2. `Window → MCP for Unity` でサーバーを起動し、「Configure All Detected Clients」で Claude Code を登録する。
+   サーバーの起動には Python 3.10 以上と `uv` が必要（無いと「uv Not Found」になる。ウィンドウの案内に従って入れる）
+   （ユーザー設定に `UnityMCP`（`http://127.0.0.1:8080/mcp`）が登録される。プロジェクトに設定ファイルは作られない）
+3. `claude mcp list` で `UnityMCP` が Connected になっていることを確かめる。Claude Code の起動後に登録したときは、
+   Claude Code を再起動しないとツールが見えない
+
+### 操作するときの決まり
+- **エディタは利用者が開いておく。** Claude Code がエディタを起動・終了しない
+- 操作の前に `mcpforunity://editor/state` で状態（コンパイル中でないか、Play Mode でないか、開いているシーン）を確かめる。
+  操作の後は `read_console` でエラーが無いことと、スクリーンショットで見た目を確かめる
+- **シーン（`.unity`）・プレハブ（`.prefab`）の変更は MCP で行い、YAML を手で書き換えない。** 変更したら保存してからコミットする
+- **Play Mode 中の変更は保存されない。** 配置や設定の変更は Play Mode を止めてから行う
+- 利用者が同時にエディタで作業していることがある。開いているシーンを勝手に切り替えたり、保存していない変更を破棄したりする前に確認する
+- スクリプトを作成・編集したらコンパイルを待ち（`editor/state` の `is_compiling` が false になるまで）、コンソールのエラーを確かめる
+- 変更したシーン・プレハブは、PR に差分の要点（何を追加・変更したか）と、エディタで確かめる手順を書く
+- コミット前の手早いテストは MCP の `run_tests`（エディタの Test Runner と同じ）で行ってよい。PR の記録は `run-checks.ps1` で作る
+- MCP for Unity は batchmode ではサーバーを起動しない（環境変数 `UNITY_MCP_ALLOW_BATCH` を設定したときを除く）ので、
+  検証やビルドで batchmode の Unity を動かしても、エディタの MCP とはぶつからない。`UNITY_MCP_ALLOW_BATCH` は設定しない
+- パッケージの更新は、リリースタグを指定して `Packages/manifest.json` を書き換える（`#main` にしない）。更新したら利用者に
+  「Configure」をやり直してもらう必要があるか、リリースノートで確かめる
 
 ## ローカルでの起動
 
